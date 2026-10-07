@@ -41,6 +41,30 @@ enum DocumentType {
   SALES_ORDER
   INVOICE
   PAYMENT
+  ROAST_RUN
+  DELIVERY_RUN
+}
+
+enum ProductKind {
+  FINISHED // sold to customers (roasted, instant, pods...)
+  GREEN // unroasted coffee: roast-run input (may also be sold)
+}
+
+enum StockMovementType {
+  RECEIPT // goods received (purchase, opening stock)
+  ROAST_INPUT // green coffee consumed by a roast run
+  ROAST_OUTPUT // finished goods produced by a roast run
+  DISPATCH // loaded onto a delivery run
+  RETURN // brought back from a failed delivery stop
+  DELIVERY // delivered directly from the warehouse (no run)
+  ADJUSTMENT // stock count correction, damage, samples
+}
+
+enum DeliveryRunStatus {
+  PLANNED
+  DISPATCHED // goods have left the warehouse
+  COMPLETED
+  CANCELLED
 }
 
 enum CustomerType {
@@ -98,6 +122,11 @@ model Organization {
   invoices          Invoice[]
   payments          Payment[]
   documentSequences DocumentSequence[]
+  warehouses        Warehouse[]
+  stockBatches      StockBatch[]
+  stockMovements    StockMovement[]
+  roastRuns         RoastRun[]
+  deliveryRuns      DeliveryRun[]
 
   @@map("organizations")
 }
@@ -130,6 +159,8 @@ model User {
   salesOrders       SalesOrder[]    @relation("OrderSalesperson")
   ordersCreated     SalesOrder[]    @relation("OrderCreatedBy")
   paymentsReceived  Payment[]       @relation("PaymentReceivedBy")
+  deliveryRuns      DeliveryRun[]   @relation("RunDriver")
+  stockMovements    StockMovement[]
 
   @@index([organizationId])
   @@map("users")
@@ -184,22 +215,25 @@ model Customer {
 }
 
 model Product {
-  id             String   @id @default(cuid())
+  id             String      @id @default(cuid())
   organizationId String
   name           String // e.g. 250G Roasted Coffee, 500G MG
   sku            String?
   category       String // e.g. Roasted Coffee, Instant, Beans
-  unitPrice      Decimal  @db.Decimal(14, 2) // list price per unit
-  unitOfMeasure  String   @default("KG") // e.g. KG, Pack, Bottle
-  weightKg       Float    @default(0) // net coffee weight of one unit, e.g. 0.25 for a 250g pack
-  isActive       Boolean  @default(true)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  unitPrice      Decimal     @db.Decimal(14, 2) // list price per unit
+  unitOfMeasure  String      @default("KG") // e.g. KG, Pack, Bottle
+  weightKg       Float       @default(0) // net coffee weight of one unit, e.g. 0.25 for a 250g pack
+  kind           ProductKind @default(FINISHED)
+  shelfLifeDays  Int? // best-before = roast/receipt date + this many days; null = no expiry
+  isActive       Boolean     @default(true)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
 
   organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   mainProductOf  Customer[]       @relation("CustomerMainProduct")
   orderLines     SalesOrderLine[]
   priceListItems PriceListItem[]
+  stockBatches   StockBatch[]
 
   @@index([organizationId])
   @@map("products")
@@ -358,44 +392,49 @@ model PriceListItem {
 
 /// Order lifecycle: PENDING_APPROVAL (credit hold) -> CONFIRMED -> DELIVERED (invoice issued), or CANCELLED.
 model SalesOrder {
-  id               String      @id @default(cuid())
-  organizationId   String
-  orderNumber      String // e.g. SO-000123
-  customerId       String
-  salespersonId    String
-  visitLogId       String?     @unique
-  orderDate        DateTime    @db.Date
-  status           OrderStatus @default(CONFIRMED)
-  paymentTermsDays Int         @default(0) // copied from the customer when placed
-  subtotal         Decimal     @db.Decimal(14, 2) // excluding VAT
-  vatAmount        Decimal     @db.Decimal(14, 2)
-  total            Decimal     @db.Decimal(14, 2) // including VAT
-  notes            String?
-  holdReason       String?
-  createdById      String
-  approvedById     String?
-  approvedAt       DateTime?
-  deliveredById    String?
-  deliveredAt      DateTime?
-  cancelledById    String?
-  cancelledAt      DateTime?
-  cancelReason     String?
-  createdAt        DateTime    @default(now())
-  updatedAt        DateTime    @updatedAt
+  id                   String      @id @default(cuid())
+  organizationId       String
+  orderNumber          String // e.g. SO-000123
+  customerId           String
+  salespersonId        String
+  visitLogId           String?     @unique
+  deliveryRunId        String? // set while the order is a stop on a delivery run
+  deliveryFailedReason String? // reason for the last failed delivery attempt
+  orderDate            DateTime    @db.Date
+  status               OrderStatus @default(CONFIRMED)
+  paymentTermsDays     Int         @default(0) // copied from the customer when placed
+  subtotal             Decimal     @db.Decimal(14, 2) // excluding VAT
+  vatAmount            Decimal     @db.Decimal(14, 2)
+  total                Decimal     @db.Decimal(14, 2) // including VAT
+  notes                String?
+  holdReason           String?
+  createdById          String
+  approvedById         String?
+  approvedAt           DateTime?
+  deliveredById        String?
+  deliveredAt          DateTime?
+  cancelledById        String?
+  cancelledAt          DateTime?
+  cancelReason         String?
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime    @updatedAt
 
-  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  customer     Customer         @relation(fields: [customerId], references: [id], onDelete: Restrict)
-  salesperson  User             @relation("OrderSalesperson", fields: [salespersonId], references: [id], onDelete: Restrict)
-  createdBy    User             @relation("OrderCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
-  visitLog     VisitLog?        @relation(fields: [visitLogId], references: [id], onDelete: SetNull)
-  lines        SalesOrderLine[]
-  invoice      Invoice?
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer       Customer         @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  salesperson    User             @relation("OrderSalesperson", fields: [salespersonId], references: [id], onDelete: Restrict)
+  createdBy      User             @relation("OrderCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  visitLog       VisitLog?        @relation(fields: [visitLogId], references: [id], onDelete: SetNull)
+  deliveryRun    DeliveryRun?     @relation(fields: [deliveryRunId], references: [id], onDelete: SetNull)
+  lines          SalesOrderLine[]
+  invoice        Invoice?
+  stockMovements StockMovement[]
 
   @@unique([organizationId, orderNumber])
   @@index([organizationId, orderDate])
   @@index([organizationId, status])
   @@index([customerId])
   @@index([salespersonId])
+  @@index([deliveryRunId])
   @@map("sales_orders")
 }
 
@@ -457,6 +496,7 @@ model Payment {
   reference      String? // MoMo transaction id, bank reference, cheque number
   paidOn         DateTime      @db.Date
   receivedById   String
+  deliveryRunId  String? // collected by the driver on this delivery run
   notes          String?
   createdAt      DateTime      @default(now())
 
@@ -464,6 +504,7 @@ model Payment {
   invoice      Invoice      @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
   customer     Customer     @relation(fields: [customerId], references: [id], onDelete: Restrict)
   receivedBy   User         @relation("PaymentReceivedBy", fields: [receivedById], references: [id], onDelete: Restrict)
+  deliveryRun  DeliveryRun? @relation(fields: [deliveryRunId], references: [id], onDelete: Restrict)
 
   @@unique([organizationId, paymentNumber])
   @@index([invoiceId])
@@ -482,6 +523,137 @@ model DocumentSequence {
 
   @@id([organizationId, type])
   @@map("document_sequences")
+}
+
+// ==========================================
+// 5c. INVENTORY, ROASTING & DELIVERY RUNS
+// ==========================================
+
+model Warehouse {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  address        String?
+  isDefault      Boolean  @default(false) // used for direct deliveries and as the form default
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  batches      StockBatch[]
+  roastRuns    RoastRun[]
+  deliveryRuns DeliveryRun[]
+
+  @@unique([organizationId, name])
+  @@map("warehouses")
+}
+
+/// A lot of one product in one warehouse. quantityOnHand is kept in step with the
+/// movement ledger inside the same transaction and can never go below zero.
+model StockBatch {
+  id             String    @id @default(cuid())
+  organizationId String
+  warehouseId    String
+  productId      String
+  batchNumber    String // supplier lot, or the roast run number for roasted output
+  roastDate      DateTime? @db.Date
+  bestBefore     DateTime? @db.Date
+  receivedOn     DateTime  @db.Date
+  quantityOnHand Decimal   @db.Decimal(12, 3)
+  supplier       String?
+  roastRunId     String? // set for batches produced by a roast run
+  notes          String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  warehouse    Warehouse       @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+  product      Product         @relation(fields: [productId], references: [id], onDelete: Restrict)
+  roastRun     RoastRun?       @relation(fields: [roastRunId], references: [id], onDelete: Restrict)
+  movements    StockMovement[]
+
+  @@unique([warehouseId, productId, batchNumber])
+  @@index([organizationId, productId])
+  @@map("stock_batches")
+}
+
+/// Immutable stock ledger: positive quantity = into the batch, negative = out of it.
+model StockMovement {
+  id             String            @id @default(cuid())
+  organizationId String
+  batchId        String
+  type           StockMovementType
+  quantity       Decimal           @db.Decimal(12, 3)
+  orderId        String?
+  roastRunId     String?
+  deliveryRunId  String?
+  reason         String?
+  createdById    String
+  createdAt      DateTime          @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  batch        StockBatch   @relation(fields: [batchId], references: [id], onDelete: Restrict)
+  order        SalesOrder?  @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  roastRun     RoastRun?    @relation(fields: [roastRunId], references: [id], onDelete: Restrict)
+  deliveryRun  DeliveryRun? @relation(fields: [deliveryRunId], references: [id], onDelete: Restrict)
+  createdBy    User         @relation(fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([batchId])
+  @@index([orderId])
+  @@index([organizationId, createdAt])
+  @@map("stock_movements")
+}
+
+/// Roasting: green coffee consumed (ROAST_INPUT movements) -> finished batches (roastRunId).
+model RoastRun {
+  id             String   @id @default(cuid())
+  organizationId String
+  runNumber      String // e.g. RR-000012; also the batch number of its output
+  warehouseId    String
+  roastDate      DateTime @db.Date
+  greenInputKg   Decimal  @db.Decimal(12, 3)
+  outputKg       Decimal  @db.Decimal(12, 3)
+  notes          String?
+  createdById    String
+  createdAt      DateTime @default(now())
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  warehouse    Warehouse       @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+  outputs      StockBatch[]
+  movements    StockMovement[]
+
+  @@unique([organizationId, runNumber])
+  @@map("roast_runs")
+}
+
+/// A driver's trip: confirmed orders (stops) are loaded at dispatch, then each is delivered or fails.
+model DeliveryRun {
+  id             String            @id @default(cuid())
+  organizationId String
+  runNumber      String // e.g. DR-000045
+  runDate        DateTime          @db.Date
+  warehouseId    String
+  driverId       String
+  vehicle        String?
+  status         DeliveryRunStatus @default(PLANNED)
+  notes          String?
+  createdById    String
+  dispatchedAt   DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  warehouse    Warehouse       @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+  driver       User            @relation("RunDriver", fields: [driverId], references: [id], onDelete: Restrict)
+  stops        SalesOrder[]
+  movements    StockMovement[]
+  payments     Payment[]
+
+  @@unique([organizationId, runNumber])
+  @@index([organizationId, runDate])
+  @@index([driverId])
+  @@map("delivery_runs")
 }
 
 // ==========================================

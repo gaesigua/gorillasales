@@ -4,12 +4,21 @@ import { prisma } from '@/lib/prisma';
 import type { UserSession } from '@/lib/auth';
 import { toNumber } from '@/lib/domain/money';
 import { customerScope } from '@/lib/tenant';
-import type { AppConfig, CommissionRule, CustomerOption, PriceBook, PriceListDTO, RepMonthlyTarget } from '@/lib/types';
+import type {
+  AppConfig,
+  CommissionRule,
+  CustomerOption,
+  PriceBook,
+  PriceListDTO,
+  RepMonthlyTarget,
+  WarehouseDTO,
+} from '@/lib/types';
 
 export async function getAppConfig(session: UserSession): Promise<AppConfig> {
   const { organizationId } = session;
-  const [org, priceLists, reps, lookups, products, stages] = await Promise.all([
+  const [org, warehouses, priceLists, reps, lookups, products, stages] = await Promise.all([
     prisma.organization.findUniqueOrThrow({ where: { id: organizationId } }),
+    listWarehouses(session),
     prisma.priceList.findMany({ where: { organizationId, isActive: true }, select: { id: true, name: true }, orderBy: { name: 'asc' } }),
     prisma.user.findMany({
       where: { organizationId, role: 'SALES_OFFICER', isActive: true },
@@ -35,6 +44,7 @@ export async function getAppConfig(session: UserSession): Promise<AppConfig> {
       pricesIncludeVat: org.pricesIncludeVat,
     },
     priceLists,
+    warehouses,
     salespeople: reps.map((r) => ({ id: r.id, label: r.name, initials: r.initials })),
     customerCategories: lookup('CUSTOMER_CATEGORY'),
     visitOutcomes: lookup('VISIT_OUTCOME'),
@@ -46,6 +56,8 @@ export async function getAppConfig(session: UserSession): Promise<AppConfig> {
       unitPrice: toNumber(p.unitPrice),
       unitOfMeasure: p.unitOfMeasure,
       weightKg: p.weightKg,
+      kind: p.kind,
+      shelfLifeDays: p.shelfLifeDays,
     })),
     pipelineStages: stages.map((s) => ({
       id: s.id,
@@ -55,6 +67,14 @@ export async function getAppConfig(session: UserSession): Promise<AppConfig> {
       color: s.color ?? undefined,
     })),
   };
+}
+
+export async function listWarehouses(session: UserSession): Promise<WarehouseDTO[]> {
+  const rows = await prisma.warehouse.findMany({
+    where: { organizationId: session.organizationId, isActive: true },
+    orderBy: [{ isDefault: 'desc' }, { name: 'asc' }],
+  });
+  return rows.map((w) => ({ id: w.id, name: w.name, address: w.address ?? '', isDefault: w.isDefault }));
 }
 
 export async function listMonthlyTargets(session: UserSession, filter: { year?: number } = {}): Promise<RepMonthlyTarget[]> {

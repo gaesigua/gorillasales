@@ -11,7 +11,8 @@ import CustomFieldsEditor from './CustomFieldsEditor';
 import ProductsEditor from './ProductsEditor';
 import PriceListsEditor from './PriceListsEditor';
 import TaxSettingsEditor from './TaxSettingsEditor';
-import { Tags, Receipt, Tag, CheckSquare, Package, TrendingUp, CheckCircle, Info, Target, DollarSign, List, Sparkles, AlertCircle, Users } from 'lucide-react';
+import WarehousesEditor from './WarehousesEditor';
+import { Warehouse, Tags, Receipt, Tag, CheckSquare, Package, TrendingUp, CheckCircle, Info, Target, DollarSign, List, Sparkles, AlertCircle, Users } from 'lucide-react';
 import {
   saveCommissionRules,
   saveLookupList,
@@ -21,7 +22,7 @@ import {
 } from '@/actions/config';
 import type { ActionResult, CommissionRule, PriceListDTO, ProductItem, RepMonthlyTarget } from '@/lib/types';
 
-type TabId = 'lookup' | 'products' | 'price-lists' | 'tax' | 'targets' | 'commission' | 'custom-fields';
+type TabId = 'lookup' | 'products' | 'warehouses' | 'price-lists' | 'tax' | 'targets' | 'commission' | 'custom-fields';
 
 const TABS: { id: TabId; label: string; icon: React.ReactNode; description: string }[] = [
   {
@@ -34,7 +35,14 @@ const TABS: { id: TabId; label: string; icon: React.ReactNode; description: stri
     id: 'products',
     label: 'Products',
     icon: <Package size={15} />,
-    description: 'Manage the product catalogue: list prices and the coffee weight of each unit.',
+    description:
+      'Manage the product catalogue: list prices, the coffee weight of each unit, green (roast input) vs finished, and shelf life used for best-before dates.',
+  },
+  {
+    id: 'warehouses',
+    label: 'Warehouses',
+    icon: <Warehouse size={15} />,
+    description: 'Stock locations. The default warehouse is used for direct deliveries.',
   },
   {
     id: 'price-lists',
@@ -265,6 +273,16 @@ export default function ConfigAdminClient({ targets: initialTargets, commissionR
         <ProductsEditor
           products={products}
           onChange={(items) => persist(items, products, setProducts, () => saveProducts(items))}
+        />
+      )}
+
+      {activeTab === 'warehouses' && (
+        <WarehousesEditor
+          warehouses={config.warehouses}
+          onSaved={() => {
+            setStatus({ type: 'saved', message: 'Saved' });
+            router.refresh();
+          }}
         />
       )}
 

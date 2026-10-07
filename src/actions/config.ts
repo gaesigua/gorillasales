@@ -6,8 +6,10 @@ import { prisma } from '@/lib/prisma';
 import { MANAGER_ROLES, requireRole } from '@/lib/tenant';
 import { audit } from '@/lib/audit';
 import { runAction, UserFacingError } from '@/lib/actionUtils';
-import { getAppConfig, listCommissionRules, listMonthlyTargets, listPriceLists } from '@/lib/data/config';
+import { getAppConfig, listCommissionRules, listMonthlyTargets, listPriceLists, listWarehouses } from '@/lib/data/config';
+import { toNumber } from '@/lib/domain/money';
 import type {
+  WarehouseDTO,
   ActionResult,
   CommissionRule,
   LookupItem,
@@ -147,6 +149,8 @@ const productListSchema = z.array(
     unitPrice: z.coerce.number().min(0),
     unitOfMeasure: z.string().trim().min(1).max(20),
     weightKg: z.coerce.number().min(0),
+    kind: z.enum(['FINISHED', 'GREEN']).default('FINISHED'),
+    shelfLifeDays: z.coerce.number().int().min(1).max(3650).nullable().default(null),
   })
 );
 
@@ -174,6 +178,8 @@ export async function saveProducts(input: ProductItem[]): Promise<ActionResult<P
           unitPrice: item.unitPrice,
           unitOfMeasure: item.unitOfMeasure,
           weightKg: item.weightKg,
+          kind: item.kind,
+          shelfLifeDays: item.shelfLifeDays,
         };
         if (keep.has(item.id)) await tx.product.update({ where: { id: item.id }, data });
         else await tx.product.create({ data: { organizationId, ...data } });
@@ -183,6 +189,58 @@ export async function saveProducts(input: ProductItem[]): Promise<ActionResult<P
     await audit(session, 'UPDATE_PRODUCTS', 'Product', null, { products: items.map((i) => i.label) });
     revalidatePath('/', 'layout');
     return (await getAppConfig(session)).products;
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Warehouses (removing one deactivates it; it must be empty first)
+// ---------------------------------------------------------------------------
+
+const warehouseListSchema = z
+  .array(
+    z.object({
+      id: z.string(),
+      name: label,
+      address: z.string().trim().max(200).default(''),
+      isDefault: z.boolean().default(false),
+    })
+  )
+  .min(1, 'Keep at least one warehouse.');
+
+export async function saveWarehouses(input: WarehouseDTO[]): Promise<ActionResult<WarehouseDTO[]>> {
+  return runAction('saveWarehouses', async () => {
+    const session = await requireRole(MANAGER_ROLES);
+    const { organizationId } = session;
+    const items = warehouseListSchema.parse(input);
+    uniqueBy(items, (i) => i.name, 'Each warehouse name must be unique.');
+    if (items.filter((i) => i.isDefault).length !== 1) throw new UserFacingError('Choose exactly one default warehouse.');
+
+    await prisma.$transaction(async (tx) => {
+      const existing = await tx.warehouse.findMany({ where: { organizationId, isActive: true } });
+      const keep = new Set(items.filter((i) => existing.some((e) => e.id === i.id)).map((i) => i.id));
+      const removed = existing.filter((e) => !keep.has(e.id));
+      for (const w of removed) {
+        const stock = await tx.stockBatch.aggregate({ where: { warehouseId: w.id }, _sum: { quantityOnHand: true } });
+        if (toNumber(stock._sum.quantityOnHand) > 0) {
+          throw new UserFacingError(`"${w.name}" still holds stock. Move or adjust it to zero before removing the warehouse.`);
+        }
+        const openRuns = await tx.deliveryRun.count({ where: { warehouseId: w.id, status: { in: ['PLANNED', 'DISPATCHED'] } } });
+        if (openRuns) throw new UserFacingError(`"${w.name}" has open delivery runs.`);
+        // Free the name for reuse
+        await tx.warehouse.update({ where: { id: w.id }, data: { isActive: false, isDefault: false, name: `${w.name} (closed ${w.id})` } });
+      }
+      // Clear the default first so the new default never coexists with the old one
+      await tx.warehouse.updateMany({ where: { organizationId }, data: { isDefault: false } });
+      for (const item of items) {
+        const data = { name: item.name, address: item.address || null, isDefault: item.isDefault };
+        if (keep.has(item.id)) await tx.warehouse.update({ where: { id: item.id }, data });
+        else await tx.warehouse.create({ data: { organizationId, ...data } });
+      }
+    });
+
+    await audit(session, 'UPDATE_WAREHOUSES', 'Warehouse', null, { warehouses: items.map((i) => i.name) });
+    revalidatePath('/', 'layout');
+    return listWarehouses(session);
   });
 }
 

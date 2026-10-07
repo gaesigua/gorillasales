@@ -9,10 +9,11 @@ import { toNumber } from '@/lib/domain/money';
 import type { Order, OrderStatusValue } from '@/lib/types';
 
 export const orderInclude = {
-  customer: { select: { name: true, area: true } },
+  customer: { select: { name: true, area: true, phone: true, contactPerson: true, sector: true, district: true } },
   salesperson: { select: { name: true } },
   lines: { include: { product: { select: { name: true } } }, orderBy: { id: 'asc' } },
   invoice: { select: { id: true, invoiceNumber: true, payments: { select: { amount: true } } } },
+  deliveryRun: { select: { id: true, runNumber: true, status: true } },
 } satisfies Prisma.SalesOrderInclude;
 
 type OrderRow = Prisma.SalesOrderGetPayload<{ include: typeof orderInclude }>;
@@ -50,6 +51,13 @@ export function toOrderDTO(o: OrderRow): Order {
     invoiceId: o.invoice?.id ?? '',
     invoiceNumber: o.invoice?.invoiceNumber ?? '',
     amountPaid: (o.invoice?.payments ?? []).reduce((s, p) => s + toNumber(p.amount), 0),
+    deliveryRunId: o.deliveryRun?.id ?? '',
+    deliveryRunNumber: o.deliveryRun?.runNumber ?? '',
+    deliveryRunStatus: o.deliveryRun?.status ?? null,
+    deliveryFailedReason: o.deliveryFailedReason ?? '',
+    customerPhone: o.customer.phone ?? '',
+    customerContact: o.customer.contactPerson ?? '',
+    customerAddress: [o.customer.sector, o.customer.district].filter(Boolean).join(', '),
   };
 }
 

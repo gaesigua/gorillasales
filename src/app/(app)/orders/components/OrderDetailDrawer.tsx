@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { X, AlertTriangle } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
+import { useConfig } from '@/context/ConfigContext';
 import { approveOrder, cancelOrder, deliverOrder } from '@/actions/orders';
 import { canDeliverOrders } from '@/lib/roles';
 import { formatRWFFull } from '@/lib/format';
@@ -33,7 +34,10 @@ export default function OrderDetailDrawer({ order, today, onClose, onUpdated }: 
 
   const isOwn = order.salespersonId === currentUser.id;
   const canApprove = canViewAllReps && order.status === 'PENDING_APPROVAL';
-  const canDeliver = canDeliverOrders(currentUser.role) && order.status === 'CONFIRMED';
+  // Orders on a delivery run are delivered from the run
+  const canDeliver = canDeliverOrders(currentUser.role) && order.status === 'CONFIRMED' && !order.deliveryRunId;
+  const { config } = useConfig();
+  const [warehouseId, setWarehouseId] = useState(config.warehouses.find((w) => w.isDefault)?.id ?? config.warehouses[0]?.id ?? '');
   const canCancel = (canViewAllReps || isOwn) && (order.status === 'PENDING_APPROVAL' || order.status === 'CONFIRMED');
 
   async function run(action: () => Promise<{ success: true; data?: Order } | { success: false; error: string }>, message: string) {
@@ -93,6 +97,32 @@ export default function OrderDetailDrawer({ order, today, onClose, onUpdated }: 
             <dd>{order.paymentTermsDays > 0 ? `${order.paymentTermsDays} days` : 'Cash on delivery'}</dd>
             <dt className="text-muted-foreground">Coffee weight</dt>
             <dd>{order.weightKg} KG</dd>
+            {order.deliveryRunNumber && (
+              <>
+                <dt className="text-muted-foreground">Delivery run</dt>
+                <dd>
+                  <Link href="/deliveries" className="underline font-mono">
+                    {order.deliveryRunNumber}
+                  </Link>
+                </dd>
+              </>
+            )}
+            {order.deliveryFailedReason && order.status === 'CONFIRMED' && (
+              <>
+                <dt className="text-muted-foreground">Last delivery attempt</dt>
+                <dd className="text-negative">{order.deliveryFailedReason}</dd>
+              </>
+            )}
+            {order.stockShort && (
+              <>
+                <dt className="text-muted-foreground">Stock</dt>
+                <dd className={order.stockShort.length ? 'text-negative' : 'text-positive'}>
+                  {order.stockShort.length
+                    ? `Short: ${order.stockShort.map((s) => `${s.productName} (${s.missing})`).join(', ')}`
+                    : 'Covered by current stock'}
+                </dd>
+              </>
+            )}
             {order.invoiceNumber && (
               <>
                 <dt className="text-muted-foreground">Invoice</dt>
@@ -150,6 +180,17 @@ export default function OrderDetailDrawer({ order, today, onClose, onUpdated }: 
                 <label className="block text-xs font-semibold mb-1">Delivery date</label>
                 <input type="date" max={today} min={order.orderDate} value={deliveredOn} onChange={(e) => setDeliveredOn(e.target.value)} className={inputClass} />
               </div>
+              <div>
+                <label className="block text-xs font-semibold mb-1">Take stock from</label>
+                <select value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)} className={inputClass}>
+                  {config.warehouses.map((w) => (
+                    <option key={w.id} value={w.id}>
+                      {w.name}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-muted-foreground mt-1">Oldest batches are used first. Delivery is refused if stock is short.</p>
+              </div>
               <label className="flex items-center gap-2 text-sm">
                 <input type="checkbox" checked={collect} onChange={(e) => setCollect(e.target.checked)} />
                 Payment collected on delivery
@@ -184,6 +225,7 @@ export default function OrderDetailDrawer({ order, today, onClose, onUpdated }: 
                       () =>
                         deliverOrder(order.id, {
                           deliveredOn,
+                          warehouseId,
                           payment: collect ? { amount: Number(amount), method, reference } : undefined,
                         }),
                       `${order.orderNumber} delivered and invoiced`

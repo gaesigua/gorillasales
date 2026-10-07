@@ -154,6 +154,10 @@ export default function OrdersClient({ orders: initialOrders, customers, priceBo
                 <td className="px-4 py-3 text-right font-tabular font-semibold">{formatRWFFull(o.total)}</td>
                 <td className="px-4 py-3">
                   <OrderStatusBadge status={o.status} />
+                  {o.deliveryRunNumber && o.status === 'CONFIRMED' && (
+                    <div className="text-xs text-muted-foreground font-mono mt-0.5">{o.deliveryRunNumber}</div>
+                  )}
+                  {o.stockShort && o.stockShort.length > 0 && <div className="text-xs text-negative mt-0.5">Short of stock</div>}
                 </td>
                 <td className="px-4 py-3 font-mono text-muted-foreground">{o.invoiceNumber || '—'}</td>
               </tr>

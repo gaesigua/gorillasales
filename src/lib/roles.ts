@@ -25,6 +25,13 @@ export function canDeliverOrders(role: Role): boolean {
   return FULFILMENT_ROLES.includes(role);
 }
 
+/** Warehouse work: receive stock, record roast runs, plan and dispatch delivery runs. */
+export const WAREHOUSE_ROLES: Role[] = ['ADMIN', 'MANAGER', 'DELIVERY_SUPPORT'];
+
+export function canManageWarehouse(role: Role): boolean {
+  return WAREHOUSE_ROLES.includes(role);
+}
+
 /** May record the RRA EBM receipt number on invoices. */
 export function canSetEbmNumber(role: Role): boolean {
   return ['ADMIN', 'MANAGER', 'DELIVERY_SUPPORT'].includes(role);

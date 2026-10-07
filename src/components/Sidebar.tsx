@@ -19,9 +19,11 @@ import {
   ShieldCheck,
   ShoppingCart,
   Wallet,
+  Truck,
+  Package,
 } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
-import { ROLE_LABELS } from '@/lib/roles';
+import { ROLE_LABELS, WAREHOUSE_ROLES, type Role } from '@/lib/roles';
 import { logoutAction } from '@/actions/auth';
 
 interface NavItem {
@@ -30,6 +32,8 @@ interface NavItem {
   icon: React.ReactNode;
   badge?: number;
   managerOnly?: boolean;
+  /** Only shown to these roles (when set). */
+  roles?: Role[];
 }
 
 const navItems: NavItem[] = [
@@ -49,9 +53,20 @@ const navItems: NavItem[] = [
     icon: <ShoppingCart size={20} />,
   },
   {
+    label: 'Deliveries',
+    href: '/deliveries',
+    icon: <Truck size={20} />,
+    roles: [...WAREHOUSE_ROLES, 'DRIVER'],
+  },
+  {
     label: 'Receivables',
     href: '/receivables',
     icon: <Wallet size={20} />,
+  },
+  {
+    label: 'Inventory',
+    href: '/inventory',
+    icon: <Package size={20} />,
   },
   {
     label: 'Customer Management',
@@ -109,6 +124,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
   const visibleNavItems = navItems.filter((item) => {
     if (item.managerOnly && !canViewAllReps) return false;
+    if (item.roles && !item.roles.includes(currentUser.role)) return false;
     return true;
   });
 

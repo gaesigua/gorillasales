@@ -57,7 +57,7 @@ Built with Next.js 15 (App Router, Server Actions), Prisma and PostgreSQL.
 | `npm run build` | Production build (fails on type errors) |
 | `npm start` | Run the production build |
 | `npm run type-check` | TypeScript check |
-| `npm test` | Unit tests (VAT, credit control, aging, commission) |
+| `npm test` | Unit tests (VAT, credit control, aging, commission, FIFO stock, roast yield) |
 | `npm run db:migrate` | Create a migration after changing `prisma/schema.prisma` (development) |
 | `npm run db:deploy` | Apply pending migrations (use this in production) |
 | `npm run db:seed` | Load demo data |
@@ -95,11 +95,33 @@ order with an invoice (and a cash payment if the visit was marked Paid).
 2. Credit check: orders for customers with overdue invoices, or that would take a credit
    customer over their limit, go on **credit hold** until a manager approves them.
    Cash-on-delivery customers are not limited by a credit amount.
-3. Delivery staff mark the order delivered. This issues the invoice (VAT backed out of
-   VAT-inclusive prices; due after the customer's payment terms) and can record payment
-   collected on delivery.
+3. Delivery: either a **delivery run** (below) or a direct delivery from a warehouse. Delivery
+   takes the stock, issues the invoice (VAT backed out of VAT-inclusive prices; due after the
+   customer's payment terms) and can record payment collected on delivery. Delivery is refused
+   if there is not enough usable stock.
 4. Payments (cash, MTN MoMo, Airtel Money, bank, cheque) are recorded against invoices.
    Balances and aging are always calculated from invoices and payments.
+
+## Inventory and deliveries
+
+- **Stock is tracked by batch** (lot) per warehouse, with roast date and best-before date.
+  Every change is a row in an immutable stock ledger (`stock_movements`); batch balances can
+  never go negative. Deliveries and roasting always use the **oldest usable batch first**
+  (FIFO); expired batches are never used.
+- **Receive Stock** (Inventory screen) records purchases and opening stock. Best-before
+  defaults from the product's shelf life (Config → Products).
+- **Roast runs** consume green coffee and produce finished products as a new batch numbered
+  with the run (e.g. `RR-000012`). Implausible yields (outside 60–95%) are rejected.
+- **Stock counts**: managers adjust a batch to the counted quantity with a reason.
+- **Delivery runs** (Deliveries screen): warehouse staff group confirmed orders into a run for
+  a driver and vehicle. Dispatching takes the goods out of the warehouse (refused if anything
+  is short). The driver marks each stop delivered (invoice + payment collected) or failed.
+  Completing the run returns failed stops' goods to the batches they came from and puts those
+  orders back in the queue. The run shows the driver's collections by payment method for
+  cash-up.
+
+After upgrading an existing database, **record opening stock** (Inventory → Receive Stock)
+before delivering orders: the migration creates a default "Main Warehouse" with no stock.
 
 ## Access rules
 
@@ -107,7 +129,9 @@ order with an invoice (and a cash payment if the visit was marked Paid).
   Only admins can manage admin accounts.
 - **Sales officers** see only their own visits, deals, orders and invoices, plus their own and
   unassigned customers. Visits and orders they create are always recorded under their own name.
-- **Delivery support and drivers** see all orders and invoices, mark orders delivered and
-  record payments.
+- **Delivery support** (warehouse staff) and managers receive stock, record roast runs, and
+  plan, dispatch and complete delivery runs. Only managers adjust stock counts.
+- **Drivers** see their own delivery runs and mark their stops delivered or failed. Drivers and
+  delivery support also see all orders and invoices and can record payments.
 - Deactivating a user or resetting their password signs them out everywhere immediately.
 - Every change is recorded in the `audit_logs` table.

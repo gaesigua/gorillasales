@@ -6,6 +6,8 @@ const PREFIX: Record<DocumentType, string> = {
   SALES_ORDER: 'SO',
   INVOICE: 'INV',
   PAYMENT: 'RCT',
+  ROAST_RUN: 'RR',
+  DELIVERY_RUN: 'DR',
 };
 
 /**

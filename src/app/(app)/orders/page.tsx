@@ -1,5 +1,6 @@
 import { requirePageSession } from '@/lib/tenant';
 import { listOrders } from '@/lib/data/orders';
+import { attachStockCoverage } from '@/lib/data/inventory';
 import { getPriceBook, listCustomerOptions } from '@/lib/data/config';
 import { addDaysToDate, todayKigali } from '@/lib/dates';
 import type { Order } from '@/lib/types';
@@ -25,7 +26,9 @@ export default async function OrdersPage({ searchParams }: PageProps) {
   ]);
   const byId = new Map<string, Order>();
   [...openOrders, ...recentOrders].forEach((o) => byId.set(o.id, o));
-  const orders = [...byId.values()].sort((a, b) => (a.orderDate < b.orderDate ? 1 : a.orderDate > b.orderDate ? -1 : 0));
+  const sorted = [...byId.values()].sort((a, b) => (a.orderDate < b.orderDate ? 1 : a.orderDate > b.orderDate ? -1 : 0));
+  // Coverage is computed over all open orders in the organization, not just this user's
+  const orders = await attachStockCoverage(session.organizationId, today, sorted);
 
   return (
     <OrdersClient

@@ -16,8 +16,11 @@ import {
   OrderStatus,
   PaymentMethod,
   DocumentType,
+  type Prisma,
+  type StockMovementType,
 } from '@prisma/client';
 import { computeOrderTotals } from '../src/lib/domain/money';
+import { allocateFifo, round3 } from '../src/lib/domain/inventory';
 import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
@@ -69,14 +72,26 @@ const MONTHLY_TARGETS: Record<string, number> = {
 const CATEGORIES = ['Hotels', 'Coffee Shops', 'Wholesalers', 'Supermarkets', 'Shops', 'Stores', 'Galleries', 'Offices'];
 const OUTCOMES = { order: 'Order Placed', visit: 'No Order / Visit Only', followUp: 'Follow-up Required' };
 
-const PRODUCTS = [
-  { name: '250G Roasted Coffee', sku: 'RC-250', category: 'Roasted Coffee', unitPrice: 2600, unitOfMeasure: 'Pack', weightKg: 0.25 },
-  { name: '500G MG', sku: 'MG-500', category: 'Roasted Coffee', unitPrice: 4800, unitOfMeasure: 'Pack', weightKg: 0.5 },
-  { name: '1KG Roasted Coffee', sku: 'RC-1000', category: 'Roasted Coffee', unitPrice: 9000, unitOfMeasure: 'KG', weightKg: 1 },
-  { name: 'Instant Coffee Sachets', sku: 'IN-BOX', category: 'Instant', unitPrice: 1500, unitOfMeasure: 'Box', weightKg: 0.1 },
-  { name: 'Green Coffee Beans', sku: 'GR-1000', category: 'Green Coffee', unitPrice: 7500, unitOfMeasure: 'KG', weightKg: 1 },
-  { name: 'Coffee Pods 10-pack', sku: 'POD-10', category: 'Pods', unitPrice: 3500, unitOfMeasure: 'Pack', weightKg: 0.07 },
+const PRODUCTS: {
+  name: string;
+  sku: string;
+  category: string;
+  unitPrice: number;
+  unitOfMeasure: string;
+  weightKg: number;
+  kind: 'FINISHED' | 'GREEN';
+  shelfLifeDays: number | null;
+}[] = [
+  { name: '250G Roasted Coffee', sku: 'RC-250', category: 'Roasted Coffee', unitPrice: 2600, unitOfMeasure: 'Pack', weightKg: 0.25, kind: 'FINISHED', shelfLifeDays: 180 },
+  { name: '500G MG', sku: 'MG-500', category: 'Roasted Coffee', unitPrice: 4800, unitOfMeasure: 'Pack', weightKg: 0.5, kind: 'FINISHED', shelfLifeDays: 180 },
+  { name: '1KG Roasted Coffee', sku: 'RC-1000', category: 'Roasted Coffee', unitPrice: 9000, unitOfMeasure: 'KG', weightKg: 1, kind: 'FINISHED', shelfLifeDays: 180 },
+  { name: 'Instant Coffee Sachets', sku: 'IN-BOX', category: 'Instant', unitPrice: 1500, unitOfMeasure: 'Box', weightKg: 0.1, kind: 'FINISHED', shelfLifeDays: 365 },
+  { name: 'Green Coffee Beans', sku: 'GR-1000', category: 'Green Coffee', unitPrice: 7500, unitOfMeasure: 'KG', weightKg: 1, kind: 'GREEN', shelfLifeDays: 365 },
+  { name: 'Coffee Pods 10-pack', sku: 'POD-10', category: 'Pods', unitPrice: 3500, unitOfMeasure: 'Pack', weightKg: 0.07, kind: 'FINISHED', shelfLifeDays: 270 },
 ];
+
+/** Typical roast yield: roasted weight / green weight. */
+const ROAST_YIELD = 0.82;
 
 // name | category | area | contact | phone | rep | main product | monthly potential | status | remarks | new this month
 const CUSTOMERS: [string, string, string, string, string, string, string, number, CustomerStatus, string, boolean][] = [
@@ -168,10 +183,15 @@ async function main() {
   await prisma.auditLog.deleteMany();
   await prisma.customFieldValue.deleteMany();
   await prisma.customFieldDefinition.deleteMany();
+  await prisma.stockMovement.deleteMany();
   await prisma.payment.deleteMany();
   await prisma.invoice.deleteMany();
   await prisma.salesOrderLine.deleteMany();
   await prisma.salesOrder.deleteMany();
+  await prisma.deliveryRun.deleteMany();
+  await prisma.stockBatch.deleteMany();
+  await prisma.roastRun.deleteMany();
+  await prisma.warehouse.deleteMany();
   await prisma.documentSequence.deleteMany();
   await prisma.visitLog.deleteMany();
   await prisma.pipelineDeal.deleteMany();
@@ -352,7 +372,10 @@ async function main() {
   const productNames = [...products.keys()];
   const activeCustomers = customers.filter((c) => c.status !== 'INACTIVE');
   const startDate = `${new Date(Date.UTC(ty, tm - 6, 1)).toISOString().slice(0, 7)}-01`;
-  const seq: Record<DocumentType, number> = { SALES_ORDER: 0, INVOICE: 0, PAYMENT: 0 };
+  const seq: Record<DocumentType, number> = { SALES_ORDER: 0, INVOICE: 0, PAYMENT: 0, ROAST_RUN: 0, DELIVERY_RUN: 0 };
+  // Delivered orders, replayed against stock in step 10
+  const deliveredLog: { orderId: string; deliveredOn: string; lines: { productId: string; quantity: number }[] }[] = [];
+  const openOrders: { orderId: string; status: OrderStatus; lines: { productId: string; quantity: number }[] }[] = [];
   const docNo = (type: DocumentType, prefix: string) => `${prefix}-${String(++seq[type]).padStart(6, '0')}`;
   const methods: PaymentMethod[] = ['CASH', 'MTN_MOMO', 'MTN_MOMO', 'AIRTEL_MONEY', 'BANK_TRANSFER'];
   let visitCount = 0;
@@ -429,7 +452,12 @@ async function main() {
         },
       });
       orderCount++;
-      if (!deliveredOn) continue;
+      const stockLines = lines.map((l) => ({ productId: l.productId, quantity: l.quantity }));
+      if (!deliveredOn) {
+        openOrders.push({ orderId: order.id, status, lines: stockLines });
+        continue;
+      }
+      deliveredLog.push({ orderId: order.id, deliveredOn, lines: stockLines });
 
       const dueDate = addDays(deliveredOn, customer.terms);
       const invoice = await prisma.invoice.create({
@@ -475,11 +503,158 @@ async function main() {
       }
     }
   }
+  // 10. Stock. One warehouse; green coffee bought in lots; a roast run each week sized to that
+  // week's roasted-coffee demand (+15%); instant and pods bought in. Every delivery then takes
+  // stock oldest-batch-first, exactly as the app does, so the ledger and balances are consistent.
+  const warehouse = await prisma.warehouse.create({
+    data: { organizationId, name: 'Main Warehouse', address: 'Kigali Special Economic Zone, Gasabo', isDefault: true },
+  });
+  const warehouseStaff = userId('Herve Ndayisaba');
+  const driverId = userId('Gakuba Samson');
+  const productById = new Map(PRODUCTS.map((p) => [products.get(p.name)!.id, p]));
+  const greenId = products.get('Green Coffee Beans')!.id;
+
+  type SimBatch = { id: string; productId: string; quantity: number; roastDate: string | null; bestBefore: string | null; receivedOn: string };
+  const simBatches: SimBatch[] = [];
+  const movements: Prisma.StockMovementCreateManyInput[] = [];
+  const at = (date: string, hour: number) => new Date(`${date}T${String(hour).padStart(2, '0')}:00:00.000Z`);
+
+  const addBatch = async (
+    productId: string,
+    batchNumber: string,
+    quantity: number,
+    date: string,
+    opts: { roastRunId?: string; supplier?: string; type: StockMovementType; roasted?: boolean }
+  ) => {
+    const meta = productById.get(productId)!;
+    const roastDate = opts.roasted ? date : null;
+    const bestBefore = meta.shelfLifeDays ? addDays(date, meta.shelfLifeDays) : null;
+    const batch = await prisma.stockBatch.create({
+      data: {
+        organizationId,
+        warehouseId: warehouse.id,
+        productId,
+        batchNumber,
+        receivedOn: dateCol(date),
+        roastDate: roastDate ? dateCol(roastDate) : null,
+        bestBefore: bestBefore ? dateCol(bestBefore) : null,
+        quantityOnHand: 0,
+        supplier: opts.supplier ?? null,
+        roastRunId: opts.roastRunId ?? null,
+      },
+    });
+    simBatches.push({ id: batch.id, productId, quantity, roastDate, bestBefore, receivedOn: date });
+    movements.push({
+      organizationId,
+      batchId: batch.id,
+      type: opts.type,
+      quantity,
+      roastRunId: opts.roastRunId ?? null,
+      reason: opts.type === 'RECEIPT' ? `Purchase from ${opts.supplier ?? 'supplier'}` : null,
+      createdById: warehouseStaff,
+      createdAt: at(date, 7),
+    });
+  };
+  const usable = (productId: string, onDate: string) =>
+    simBatches.filter((b) => b.productId === productId && (!b.bestBefore || b.bestBefore >= onDate)).reduce((s, b) => s + b.quantity, 0);
+  const take = (
+    productId: string,
+    quantity: number,
+    onDate: string,
+    type: StockMovementType,
+    refs: { orderId?: string; roastRunId?: string; deliveryRunId?: string },
+    createdById: string
+  ) => {
+    const { allocations, shortfall } = allocateFifo(simBatches.filter((b) => b.productId === productId), quantity, onDate);
+    if (shortfall > 0) throw new Error(`Seed stock short: ${productById.get(productId)?.name} on ${onDate}`);
+    for (const a of allocations) {
+      simBatches.find((b) => b.id === a.batchId)!.quantity = round3(simBatches.find((b) => b.id === a.batchId)!.quantity - a.quantity);
+      movements.push({ organizationId, batchId: a.batchId, type, quantity: -a.quantity, ...refs, createdById, createdAt: at(onDate, 9) });
+    }
+  };
+  const demandBetween = (from: string, to: string) => {
+    const d = new Map<string, number>();
+    deliveredLog
+      .filter((o) => o.deliveredOn >= from && o.deliveredOn < to)
+      .forEach((o) => o.lines.forEach((l) => d.set(l.productId, (d.get(l.productId) ?? 0) + l.quantity)));
+    return d;
+  };
+
+  const roast = async (date: string, outputs: Map<string, number>) => {
+    const outputKg = round3([...outputs].reduce((s, [id, q]) => s + q * productById.get(id)!.weightKg, 0));
+    if (outputKg <= 0) return;
+    const greenKg = Math.ceil((outputKg / ROAST_YIELD) * 10) / 10;
+    if (usable(greenId, date) < greenKg) {
+      await addBatch(greenId, `GL-${date}`, Math.ceil(greenKg * 4), date, { type: 'RECEIPT', supplier: pick(['Musasa Washing Station', 'Huye Mountain Coffee', 'Kopakama Cooperative']) });
+    }
+    const runNumber = `RR-${String(++seq.ROAST_RUN).padStart(6, '0')}`;
+    const run = await prisma.roastRun.create({
+      data: { organizationId, runNumber, warehouseId: warehouse.id, roastDate: dateCol(date), greenInputKg: greenKg, outputKg, createdById: warehouseStaff, createdAt: at(date, 6) },
+    });
+    take(greenId, greenKg, date, 'ROAST_INPUT', { roastRunId: run.id }, warehouseStaff);
+    for (const [productId, qty] of outputs) {
+      await addBatch(productId, runNumber, qty, date, { type: 'ROAST_OUTPUT', roastRunId: run.id, roasted: true });
+    }
+  };
+
+  // Restocks a week's demand (+15%) on its first day, then replays that week's deliveries
+  const restock = async (date: string, demand: Map<string, number>) => {
+    const need = (productId: string, qty: number) => Math.ceil(qty * 1.15 - usable(productId, date));
+    // Roast first (it consumes green coffee), then buy whatever is still short, incl. green sold as-is
+    const roastOut = new Map<string, number>();
+    for (const [productId, qty] of demand) {
+      if (productById.get(productId)!.category === 'Roasted Coffee' && need(productId, qty) > 0) roastOut.set(productId, need(productId, qty));
+    }
+    await roast(date, roastOut);
+    for (const [productId, qty] of demand) {
+      const meta = productById.get(productId)!;
+      if (meta.category === 'Roasted Coffee' || need(productId, qty) <= 0) continue;
+      await addBatch(productId, `PO-${date}-${meta.sku}`, need(productId, qty), date, {
+        type: 'RECEIPT',
+        supplier: meta.kind === 'GREEN' ? 'Musasa Washing Station' : 'Regional distributor',
+      });
+    }
+  };
+
+  for (let week = startDate; week <= today; week = addDays(week, 7)) {
+    const weekEnd = addDays(week, 7);
+    await restock(week, demandBetween(week, weekEnd));
+    for (const o of deliveredLog.filter((d) => d.deliveredOn >= week && d.deliveredOn < weekEnd)) {
+      o.lines.forEach((l) => take(l.productId, l.quantity, o.deliveredOn, 'DELIVERY', { orderId: o.orderId }, driverId));
+    }
+  }
+  // Make sure today's open orders can be covered (so the demo shows a dispatchable run)
+  const openDemand = new Map<string, number>();
+  openOrders.forEach((o) => o.lines.forEach((l) => openDemand.set(l.productId, (openDemand.get(l.productId) ?? 0) + l.quantity)));
+  await restock(today, openDemand);
+
+  await prisma.stockMovement.createMany({ data: movements });
+  for (const b of simBatches) {
+    await prisma.stockBatch.update({ where: { id: b.id }, data: { quantityOnHand: b.quantity } });
+  }
+
+  // A planned delivery run for today's confirmed orders
+  const confirmed = openOrders.filter((o) => o.status === 'CONFIRMED');
+  if (confirmed.length) {
+    const run = await prisma.deliveryRun.create({
+      data: {
+        organizationId,
+        runNumber: `DR-${String(++seq.DELIVERY_RUN).padStart(6, '0')}`,
+        runDate: dateCol(today),
+        warehouseId: warehouse.id,
+        driverId,
+        vehicle: 'RAD 482 C',
+        createdById: warehouseStaff,
+      },
+    });
+    await prisma.salesOrder.updateMany({ where: { id: { in: confirmed.map((o) => o.orderId) } }, data: { deliveryRunId: run.id } });
+  }
+
   await prisma.documentSequence.createMany({
     data: (Object.keys(seq) as DocumentType[]).map((type) => ({ organizationId, type, lastNumber: seq[type] })),
   });
 
-  // 10. Commission rules
+  // 11. Commission rules
   await prisma.commissionRule.createMany({
     data: [
       { organizationId, name: 'Base Commission', ruleType: 'percentage', value: 2, thresholdPct: 0, description: 'Earned on all sales regardless of target', sortOrder: 1 },
@@ -489,7 +664,7 @@ async function main() {
     ],
   });
 
-  // 11. Example custom field
+  // 12. Example custom field
   await prisma.customFieldDefinition.create({
     data: {
       organizationId,
@@ -501,7 +676,10 @@ async function main() {
     },
   });
 
-  console.log(`✅ Seeded ${TEAM.length} users, ${customers.length} customers, ${DEALS.length} deals, ${visitCount} visits, ${orderCount} orders.`);
+  console.log(
+    `✅ Seeded ${TEAM.length} users, ${customers.length} customers, ${DEALS.length} deals, ${visitCount} visits, ${orderCount} orders, ` +
+      `${seq.ROAST_RUN} roast runs, ${simBatches.length} stock batches, ${movements.length} stock movements.`
+  );
   console.log('   Log in with any seeded email (e.g. eric.m@gorillacoffee.rw) and SEED_USER_PASSWORD.');
 }
 

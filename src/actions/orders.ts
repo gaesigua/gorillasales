@@ -7,10 +7,16 @@ import { MANAGER_ROLES, canViewAllReps, orderScope, requireRole, requireSession 
 import type { UserSession } from '@/lib/auth';
 import { audit } from '@/lib/audit';
 import { runAction, UserFacingError } from '@/lib/actionUtils';
-import { addDaysToDate, stringToDateColumn, todayKigali } from '@/lib/dates';
+import { stringToDateColumn, todayKigali } from '@/lib/dates';
 import { toNumber } from '@/lib/domain/money';
-import { nextDocumentNumber } from '@/lib/documentNumbers';
 import { dateString, placeOrderTx, type PlaceOrderInput } from '@/lib/orderService';
+import {
+  getDefaultWarehouse,
+  issueInvoiceOnDelivery,
+  requireWarehouse,
+  takeStockFifo,
+  validateDelivery,
+} from '@/lib/inventoryService';
 import { listOrders, orderInclude, toOrderDTO } from '@/lib/data/orders';
 import type { ActionResult, Order } from '@/lib/types';
 
@@ -73,10 +79,16 @@ export async function cancelOrder(orderId: string, reason: string): Promise<Acti
     if (!canViewAllReps(session) && order.salespersonId !== session.userId) {
       throw new UserFacingError('You can only cancel your own orders.');
     }
+    if (order.deliveryRun && order.deliveryRun.status === 'DISPATCHED') {
+      throw new UserFacingError(
+        `This order is out for delivery on ${order.deliveryRun.runNumber}. Mark the stop as failed first.`
+      );
+    }
 
+    // Cancelling also takes the order off a planned delivery run
     await prisma.salesOrder.update({
       where: { id: order.id },
-      data: { status: 'CANCELLED', cancelledById: session.userId, cancelledAt: new Date(), cancelReason },
+      data: { status: 'CANCELLED', cancelledById: session.userId, cancelledAt: new Date(), cancelReason, deliveryRunId: null },
     });
     await audit(session, 'CANCEL_ORDER', 'SalesOrder', order.id, { reason: cancelReason });
     return reload(session, order.id);
@@ -85,6 +97,7 @@ export async function cancelOrder(orderId: string, reason: string): Promise<Acti
 
 const deliverSchema = z.object({
   deliveredOn: dateString.optional(),
+  warehouseId: z.string().optional(),
   payment: z
     .object({
       amount: z.coerce.number().positive(),
@@ -97,8 +110,9 @@ const deliverSchema = z.object({
 export type DeliverOrderInput = z.input<typeof deliverSchema>;
 
 /**
- * Mark a confirmed order delivered: issues the invoice (due after the customer's payment
- * terms) and, optionally, records payment collected on delivery.
+ * Deliver a confirmed order directly from a warehouse (not on a delivery run): takes the
+ * stock oldest-batch-first, issues the invoice and optionally records payment collected.
+ * Refused when there is not enough usable stock.
  */
 export async function deliverOrder(orderId: string, input: DeliverOrderInput = {}): Promise<ActionResult<Order>> {
   return runAction('deliverOrder', async () => {
@@ -107,58 +121,28 @@ export async function deliverOrder(orderId: string, input: DeliverOrderInput = {
     const data = deliverSchema.parse(input);
     if (order.status === 'PENDING_APPROVAL') throw new UserFacingError('This order is on credit hold and must be approved first.');
     if (order.status !== 'CONFIRMED') throw new UserFacingError('Only confirmed orders can be delivered.');
-
-    const today = todayKigali();
-    const deliveredOn = data.deliveredOn ?? today;
-    const orderDate = order.orderDate.toISOString().slice(0, 10);
-    if (deliveredOn > today) throw new UserFacingError('Delivery date cannot be in the future.');
-    if (deliveredOn < orderDate) throw new UserFacingError('Delivery date cannot be before the order date.');
-    const total = toNumber(order.total);
-    if (data.payment && data.payment.amount > total) throw new UserFacingError('Payment is more than the invoice total.');
-    if (data.payment && data.payment.method !== 'CASH' && !data.payment.reference) {
-      throw new UserFacingError('Enter the transaction reference for non-cash payments.');
+    if (order.deliveryRunId) {
+      throw new UserFacingError(`This order is on delivery run ${order.deliveryRun?.runNumber}. Deliver it from the run.`);
     }
+    const deliveredOn = data.deliveredOn ?? todayKigali();
+    validateDelivery(order, deliveredOn, data.payment);
 
-    const org = await prisma.organization.findUniqueOrThrow({ where: { id: session.organizationId } });
     const invoice = await prisma.$transaction(async (tx) => {
-      // Guard against two people delivering the same order at once
-      const updated = await tx.salesOrder.updateMany({
-        where: { id: order.id, status: 'CONFIRMED' },
-        data: { status: 'DELIVERED', deliveredById: session.userId, deliveredAt: new Date() },
-      });
-      if (updated.count !== 1) throw new UserFacingError('Order was changed by someone else. Refresh and try again.');
-
-      const inv = await tx.invoice.create({
-        data: {
-          organizationId: session.organizationId,
-          invoiceNumber: await nextDocumentNumber(tx, session.organizationId, 'INVOICE'),
+      const warehouse = data.warehouseId
+        ? await requireWarehouse(tx, session.organizationId, data.warehouseId)
+        : await getDefaultWarehouse(tx, session.organizationId);
+      for (const line of order.lines) {
+        await takeStockFifo(tx, session, {
+          warehouseId: warehouse.id,
+          productId: line.productId,
+          productName: line.product.name,
+          quantity: toNumber(line.quantity),
+          onDate: deliveredOn,
+          type: 'DELIVERY',
           orderId: order.id,
-          customerId: order.customerId,
-          issueDate: stringToDateColumn(deliveredOn),
-          dueDate: stringToDateColumn(addDaysToDate(deliveredOn, order.paymentTermsDays)),
-          vatRate: org.vatRate,
-          subtotal: order.subtotal,
-          vatAmount: order.vatAmount,
-          total: order.total,
-        },
-      });
-      if (data.payment) {
-        await tx.payment.create({
-          data: {
-            organizationId: session.organizationId,
-            paymentNumber: await nextDocumentNumber(tx, session.organizationId, 'PAYMENT'),
-            invoiceId: inv.id,
-            customerId: order.customerId,
-            amount: data.payment.amount,
-            method: data.payment.method,
-            reference: data.payment.reference || null,
-            paidOn: stringToDateColumn(deliveredOn),
-            receivedById: session.userId,
-            notes: 'Collected on delivery',
-          },
         });
       }
-      return inv;
+      return issueInvoiceOnDelivery(tx, session, order, deliveredOn, data.payment);
     });
 
     await audit(session, 'DELIVER_ORDER', 'SalesOrder', order.id, {

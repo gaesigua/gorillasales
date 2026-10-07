@@ -17,6 +17,8 @@ interface FormState {
   unitPrice: string;
   unitOfMeasure: string;
   weightKg: string;
+  kind: 'FINISHED' | 'GREEN';
+  shelfLifeDays: string;
 }
 
 const EMPTY_FORM: FormState = {
@@ -26,6 +28,8 @@ const EMPTY_FORM: FormState = {
   unitPrice: '',
   unitOfMeasure: 'Pack',
   weightKg: '',
+  kind: 'FINISHED',
+  shelfLifeDays: '180',
 };
 
 function toForm(p: ProductItem): FormState {
@@ -36,6 +40,8 @@ function toForm(p: ProductItem): FormState {
     unitPrice: String(p.unitPrice),
     unitOfMeasure: p.unitOfMeasure,
     weightKg: String(p.weightKg),
+    kind: p.kind,
+    shelfLifeDays: p.shelfLifeDays ? String(p.shelfLifeDays) : '',
   };
 }
 
@@ -54,6 +60,9 @@ export default function ProductsEditor({ products, onChange }: ProductsEditorPro
     const kg = Number(form.weightKg);
     if (form.weightKg === '' || isNaN(kg) || kg < 0) return 'Enter the coffee weight of one unit in KG (e.g. 0.25)';
     if (!form.unitOfMeasure.trim()) return 'Enter a unit (e.g. Pack, KG, Box)';
+    if (form.shelfLifeDays !== '' && !(Number.isInteger(Number(form.shelfLifeDays)) && Number(form.shelfLifeDays) > 0)) {
+      return 'Shelf life must be a whole number of days, or blank for no expiry';
+    }
     return '';
   };
 
@@ -71,6 +80,8 @@ export default function ProductsEditor({ products, onChange }: ProductsEditorPro
       unitPrice: Number(form.unitPrice),
       unitOfMeasure: form.unitOfMeasure.trim(),
       weightKg: Number(form.weightKg),
+      kind: form.kind,
+      shelfLifeDays: form.shelfLifeDays === '' ? null : Number(form.shelfLifeDays),
     };
     onChange(editingId === 'new' ? [...products, item] : products.map((p) => (p.id === editingId ? item : p)));
     cancel();
@@ -93,6 +104,13 @@ export default function ProductsEditor({ products, onChange }: ProductsEditorPro
       <td className="px-3 py-2"><input className={inputClass} type="number" min="0" placeholder="RWF" value={form.unitPrice} onChange={(e) => setForm({ ...form, unitPrice: e.target.value })} /></td>
       <td className="px-3 py-2"><input className={inputClass} placeholder="Pack" value={form.unitOfMeasure} onChange={(e) => setForm({ ...form, unitOfMeasure: e.target.value })} /></td>
       <td className="px-3 py-2"><input className={inputClass} type="number" min="0" step="0.001" placeholder="0.25" value={form.weightKg} onChange={(e) => setForm({ ...form, weightKg: e.target.value })} /></td>
+      <td className="px-3 py-2">
+        <select className={inputClass} value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value as FormState['kind'] })}>
+          <option value="FINISHED">Finished</option>
+          <option value="GREEN">Green (roast input)</option>
+        </select>
+      </td>
+      <td className="px-3 py-2"><input className={inputClass} type="number" min="1" placeholder="none" value={form.shelfLifeDays} onChange={(e) => setForm({ ...form, shelfLifeDays: e.target.value })} /></td>
       <td className="px-3 py-2">
         <div className="flex items-center justify-end gap-1">
           <button onClick={save} className="p-1.5 rounded-md bg-accent text-white hover:bg-accent/90" title="Save"><Check size={13} /></button>
@@ -141,6 +159,8 @@ export default function ProductsEditor({ products, onChange }: ProductsEditorPro
               <th className="px-3 py-2.5 text-right font-semibold">Unit Price (RWF)</th>
               <th className="px-3 py-2.5 text-left font-semibold">Unit</th>
               <th className="px-3 py-2.5 text-right font-semibold">KG / Unit</th>
+              <th className="px-3 py-2.5 text-left font-semibold">Kind</th>
+              <th className="px-3 py-2.5 text-right font-semibold">Shelf Life (days)</th>
               <th className="px-3 py-2.5" />
             </tr>
           </thead>
@@ -156,6 +176,8 @@ export default function ProductsEditor({ products, onChange }: ProductsEditorPro
                   <td className="px-3 py-2.5 text-right font-tabular">{p.unitPrice.toLocaleString()}</td>
                   <td className="px-3 py-2.5 text-muted-foreground">{p.unitOfMeasure}</td>
                   <td className="px-3 py-2.5 text-right font-tabular">{p.weightKg}</td>
+                  <td className="px-3 py-2.5 text-muted-foreground">{p.kind === 'GREEN' ? 'Green' : 'Finished'}</td>
+                  <td className="px-3 py-2.5 text-right font-tabular">{p.shelfLifeDays ?? '—'}</td>
                   <td className="px-3 py-2.5">
                     <div className="flex items-center justify-end gap-1">
                       {deleteConfirmId === p.id ? (
@@ -205,7 +227,7 @@ export default function ProductsEditor({ products, onChange }: ProductsEditorPro
             {editingId === 'new' && formRow}
             {products.length === 0 && editingId !== 'new' && (
               <tr>
-                <td colSpan={7} className="px-3 py-6 text-center text-xs text-muted-foreground">
+                <td colSpan={9} className="px-3 py-6 text-center text-xs text-muted-foreground">
                   No products yet. Add your first product.
                 </td>
               </tr>

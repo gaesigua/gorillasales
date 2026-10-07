@@ -97,6 +97,121 @@ export interface Order {
   invoiceId: string;
   invoiceNumber: string;
   amountPaid: number; // payments on this order's invoice
+  deliveryRunId: string;
+  deliveryRunNumber: string;
+  deliveryRunStatus: DeliveryRunStatusValue | null;
+  deliveryFailedReason: string;
+  customerPhone: string;
+  customerContact: string;
+  customerAddress: string;
+  /** For open orders: whether current stock covers it (oldest orders served first). */
+  stockShort?: { productName: string; missing: number }[];
+}
+
+export type DeliveryRunStatusValue = 'PLANNED' | 'DISPATCHED' | 'COMPLETED' | 'CANCELLED';
+export const DELIVERY_RUN_STATUS_LABELS: Record<DeliveryRunStatusValue, string> = {
+  PLANNED: 'Planned',
+  DISPATCHED: 'Out for delivery',
+  COMPLETED: 'Completed',
+  CANCELLED: 'Cancelled',
+};
+
+export type StockMovementTypeValue =
+  | 'RECEIPT'
+  | 'ROAST_INPUT'
+  | 'ROAST_OUTPUT'
+  | 'DISPATCH'
+  | 'RETURN'
+  | 'DELIVERY'
+  | 'ADJUSTMENT';
+export const STOCK_MOVEMENT_LABELS: Record<StockMovementTypeValue, string> = {
+  RECEIPT: 'Received',
+  ROAST_INPUT: 'Roasted (green used)',
+  ROAST_OUTPUT: 'Roasted (produced)',
+  DISPATCH: 'Loaded on delivery run',
+  RETURN: 'Returned from delivery',
+  DELIVERY: 'Delivered directly',
+  ADJUSTMENT: 'Adjustment',
+};
+
+export interface WarehouseDTO {
+  id: string;
+  name: string;
+  address: string;
+  isDefault: boolean;
+}
+
+export interface StockBatchDTO {
+  id: string;
+  warehouseId: string;
+  warehouseName: string;
+  productId: string;
+  productName: string;
+  unitOfMeasure: string;
+  batchNumber: string;
+  roastDate: string;
+  bestBefore: string;
+  receivedOn: string;
+  quantity: number;
+  supplier: string;
+  ageDays: number; // since roast (or receipt)
+  expired: boolean;
+}
+
+export interface ProductStock {
+  productId: string;
+  productName: string;
+  kind: 'FINISHED' | 'GREEN';
+  unitOfMeasure: string;
+  onHand: number; // usable (non-expired) stock in active warehouses
+  expired: number;
+  reserved: number; // confirmed + held orders not yet dispatched/delivered
+  available: number; // onHand - reserved (may be negative = shortage)
+}
+
+export interface StockMovementDTO {
+  id: string;
+  createdAt: string;
+  type: StockMovementTypeValue;
+  quantity: number;
+  productName: string;
+  batchNumber: string;
+  warehouseName: string;
+  reference: string; // order / run number
+  reason: string;
+  by: string;
+}
+
+export interface RoastRunDTO {
+  id: string;
+  runNumber: string;
+  roastDate: string;
+  warehouseName: string;
+  greenInputKg: number;
+  outputKg: number;
+  yieldPct: number;
+  outputs: { productName: string; quantity: number }[];
+  inputs: { productName: string; batchNumber: string; quantity: number }[];
+  notes: string;
+  by: string;
+}
+
+export interface DeliveryRunDTO {
+  id: string;
+  runNumber: string;
+  runDate: string;
+  status: DeliveryRunStatusValue;
+  warehouseId: string;
+  warehouseName: string;
+  driverId: string;
+  driverName: string;
+  vehicle: string;
+  notes: string;
+  stops: Order[];
+  /** Products to pick for the run, with the oldest usable batches suggested. */
+  picking: { productName: string; quantity: number; batches: { batchNumber: string; quantity: number }[]; short: number }[];
+  /** Payments collected by the driver on this run's stops, by method. */
+  collections: { method: PaymentMethodValue; amount: number }[];
 }
 
 export interface PaymentRecord {
@@ -264,6 +379,8 @@ export interface ProductItem {
   unitPrice: number;
   unitOfMeasure: string;
   weightKg: number;
+  kind: 'FINISHED' | 'GREEN';
+  shelfLifeDays: number | null;
 }
 
 export interface SalespersonItem {
@@ -276,6 +393,7 @@ export interface SalespersonItem {
 export interface AppConfig {
   settings: OrganizationSettings;
   priceLists: { id: string; name: string }[];
+  warehouses: WarehouseDTO[];
   salespeople: SalespersonItem[];
   customerCategories: LookupItem[];
   visitOutcomes: LookupItem[];

@@ -1,45 +1,21 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { ConfigStore, DEFAULT_CONFIG, loadConfig, saveConfig } from '@/lib/configStore';
+import React, { createContext, useContext } from 'react';
+import type { AppConfig } from '@/lib/types';
 
-interface ConfigContextValue {
-  config: ConfigStore;
-  updateConfig: (next: ConfigStore) => void;
-}
+const ConfigContext = createContext<AppConfig | null>(null);
 
-const ConfigContext = createContext<ConfigContextValue | null>(null);
-
-export function ConfigProvider({ children }: { children: React.ReactNode }) {
-  // Initialize with DEFAULT_CONFIG to match SSR output, then hydrate from localStorage
-  const [config, setConfig] = useState<ConfigStore>(DEFAULT_CONFIG);
-
-  useEffect(() => {
-    // Load from localStorage after hydration to avoid SSR/client mismatch
-    setConfig(loadConfig());
-  }, []);
-
-  const updateConfig = useCallback((next: ConfigStore) => {
-    setConfig(next);
-    saveConfig(next);
-  }, []);
-
-  // Sync from storage on focus (other tabs)
-  useEffect(() => {
-    const onFocus = () => setConfig(loadConfig());
-    window.addEventListener('focus', onFocus);
-    return () => window.removeEventListener('focus', onFocus);
-  }, []);
-
-  return (
-    <ConfigContext.Provider value={{ config, updateConfig }}>
-      {children}
-    </ConfigContext.Provider>
-  );
+/**
+ * Org-wide reference data (salespeople, categories, products, stages), loaded from the
+ * database by the app layout. Saving changes revalidates the layout, which re-renders
+ * this provider with fresh data.
+ */
+export function ConfigProvider({ config, children }: { config: AppConfig; children: React.ReactNode }) {
+  return <ConfigContext.Provider value={config}>{children}</ConfigContext.Provider>;
 }
 
 export function useConfig() {
-  const ctx = useContext(ConfigContext);
-  if (!ctx) throw new Error('useConfig must be used inside ConfigProvider');
-  return ctx;
+  const config = useContext(ConfigContext);
+  if (!config) throw new Error('useConfig must be used inside ConfigProvider');
+  return { config };
 }

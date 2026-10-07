@@ -1,11 +1,12 @@
 import { SignJWT, jwtVerify } from 'jose';
+import type { Role } from './roles';
 
 // Edge-safe session primitives (no Prisma, no next/headers) so middleware can share them.
 
 export const COOKIE_NAME = 'gorillasales_session';
 export const SESSION_MAX_AGE_SECONDS = 7 * 24 * 60 * 60;
 
-export type SessionRole = 'ADMIN' | 'MANAGER' | 'SALES_OFFICER' | 'DELIVERY_SUPPORT' | 'DRIVER';
+export type SessionRole = Role;
 
 export interface UserSession {
   userId: string;
@@ -15,6 +16,7 @@ export interface UserSession {
   organizationId: string;
   organizationName: string;
   initials: string;
+  sessionVersion: number;
 }
 
 function getSecret(): Uint8Array {

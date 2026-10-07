@@ -40,9 +40,11 @@ export async function loginAction(
       organizationId: user.organizationId,
       organizationName: user.organization.name,
       initials: user.initials,
+      sessionVersion: user.sessionVersion,
     };
 
     await setSessionCookie(session);
+    await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
     return { success: true };
   } catch (error) {
     console.error('Error in loginAction:', error);

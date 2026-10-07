@@ -2,8 +2,6 @@ import React from 'react';
 import type { Metadata, Viewport } from 'next';
 import { Roboto } from 'next/font/google';
 import '../styles/tailwind.css';
-import { ConfigProvider } from '@/context/ConfigContext';
-import { UserProvider } from '@/context/UserContext';
 
 const roboto = Roboto({
   subsets: ['latin'],
@@ -31,13 +29,7 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className={roboto.variable}>
-      <body>
-        <ConfigProvider>
-          <UserProvider>
-            {children}
-          </UserProvider>
-        </ConfigProvider>
-      </body>
+      <body>{children}</body>
     </html>
   );
 }

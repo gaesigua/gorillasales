@@ -1,179 +1,141 @@
 'use server';
 
+import { revalidatePath } from 'next/cache';
+import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
-import { requireSession, scopedSalespersonId } from '@/lib/tenant';
-import { visitLogs as mockVisits } from '@/lib/mockData';
+import { canViewAllReps, customerScope, requireSession, scopedSalespersonId } from '@/lib/tenant';
+import { audit } from '@/lib/audit';
+import { runAction, UserFacingError } from '@/lib/actionUtils';
+import { stringToDateColumn } from '@/lib/dates';
+import { listVisits, toVisitDTO, visitInclude } from '@/lib/data/visits';
+import type { ActionResult, PaymentStatusValue, VisitLog } from '@/lib/types';
 
-export interface VisitLogDTO {
-  id: string;
-  timestamp: string;
-  salespersonId?: string;
-  salesperson: string;
-  dateOfVisit: string;
-  customerId?: string;
-  customerName: string;
-  area: string;
-  customerCategory: string;
-  visitOutcome: string;
-  productId?: string;
-  productCategory: string;
-  quantity: number;
-  unitPrice: number;
-  salesValue: number;
-  paymentStatus: string;
-  customerType: string;
-  nextFollowUpDate: string;
-  remarks: string;
-}
+const dateString = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date');
+
+const createVisitSchema = z.object({
+  salespersonId: z.string().optional(),
+  customerId: z.string().min(1, 'Select a customer'),
+  dateOfVisit: dateString,
+  visitOutcome: z.string().trim().min(1, 'Select an outcome').max(120),
+  productId: z.string().optional(),
+  quantity: z.coerce.number().min(0).default(0),
+  unitPrice: z.coerce.number().min(0).default(0),
+  paymentStatus: z.enum(['PAID', 'CREDIT', 'PENDING', 'OVERDUE', 'PARTIAL']).default('PENDING'),
+  nextFollowUpDate: dateString.optional().or(z.literal('')),
+  remarks: z.string().trim().max(2000).optional(),
+});
 
 export interface CreateVisitInput {
-  salespersonId: string;
+  salespersonId?: string;
   customerId: string;
   dateOfVisit: string;
   visitOutcome: string;
   productId?: string;
-  productCategory?: string;
   quantity: number;
   unitPrice: number;
-  paymentStatus: 'PAID' | 'CREDIT' | 'PENDING' | 'OVERDUE' | 'PARTIAL' | 'Paid' | 'Credit' | 'Pending';
+  paymentStatus: PaymentStatusValue;
   nextFollowUpDate?: string;
   remarks?: string;
 }
 
 /**
- * Fetch all Visit Logs for the current organization
+ * Record a new sales visit. Sales officers always log as themselves; managers may log
+ * on behalf of a rep in their organization.
  */
-export async function getVisitLogs(salespersonId?: string): Promise<VisitLogDTO[]> {
-  const session = await requireSession();
-  const { organizationId } = session;
-  try {
-    const where: any = { organizationId };
-    const repId = scopedSalespersonId(session, salespersonId);
-    if (repId) {
-      where.salespersonId = repId;
-    }
+export async function createVisitLog(input: CreateVisitInput): Promise<ActionResult<VisitLog>> {
+  return runAction('createVisitLog', async () => {
+    const session = await requireSession();
+    const { organizationId } = session;
+    const data = createVisitSchema.parse(input);
 
-    const dbLogs = await prisma.visitLog.findMany({
-      where,
-      include: {
-        salesperson: { select: { id: true, name: true } },
-        customer: { select: { id: true, name: true, area: true, category: true, customerType: true } },
-        product: { select: { id: true, name: true, category: true } },
-      },
-      orderBy: { dateOfVisit: 'desc' },
-    });
-
-    if (dbLogs.length > 0) {
-      return dbLogs.map((v: any) => ({
-        id: v.id,
-        timestamp: v.createdAt.toISOString(),
-        salespersonId: v.salespersonId,
-        salesperson: v.salesperson.name,
-        dateOfVisit: v.dateOfVisit.toISOString().split('T')[0],
-        customerId: v.customerId,
-        customerName: v.customer.name,
-        area: v.customer.area,
-        customerCategory: v.customer.category,
-        visitOutcome: v.visitOutcome,
-        productId: v.productId ?? undefined,
-        productCategory: v.product?.name ?? v.product?.category ?? 'Coffee Products',
-        quantity: v.quantity,
-        unitPrice: v.unitPrice,
-        salesValue: v.salesValue,
-        paymentStatus: v.paymentStatus,
-        customerType: v.customer.customerType,
-        nextFollowUpDate: v.nextFollowUpDate ? v.nextFollowUpDate.toISOString().split('T')[0] : '',
-        remarks: v.remarks ?? '',
-      }));
-    }
-  } catch (error) {
-    console.warn('⚠️ Server Action getVisitLogs: DB fetch failed or empty, returning mock data.', error);
-  }
-
-  // Fallback to mockVisits
-  return mockVisits.map((v: any) => ({
-    ...v,
-    timestamp: v.timestamp || new Date().toISOString(),
-  }));
-}
-
-/**
- * Record a new Sales Visit in database
- */
-export async function createVisitLog(input: CreateVisitInput): Promise<{ success: boolean; visit?: VisitLogDTO; error?: string }> {
-  const session = await requireSession();
-  const { organizationId } = session;
-  try {
-    // Sales officers always log visits as themselves; managers may log for a rep in their org
-    const salespersonId = scopedSalespersonId(session, input.salespersonId) ?? session.userId;
+    const salespersonId = scopedSalespersonId(session, data.salespersonId) || session.userId;
+    const productId = data.productId || undefined;
     const [rep, customer, product] = await Promise.all([
       prisma.user.findFirst({ where: { id: salespersonId, organizationId }, select: { id: true } }),
-      prisma.customer.findFirst({ where: { id: input.customerId, organizationId }, select: { id: true } }),
-      input.productId
-        ? prisma.product.findFirst({ where: { id: input.productId, organizationId }, select: { id: true } })
+      prisma.customer.findFirst({ where: { id: data.customerId, ...customerScope(session) }, select: { id: true } }),
+      productId
+        ? prisma.product.findFirst({ where: { id: productId, organizationId }, select: { id: true } })
         : Promise.resolve(null),
     ]);
-    if (!rep) return { success: false, error: 'Salesperson not found' };
-    if (!customer) return { success: false, error: 'Customer not found' };
-    if (input.productId && !product) return { success: false, error: 'Product not found' };
+    if (!rep) throw new UserFacingError('Salesperson not found.');
+    if (!customer) throw new UserFacingError('Customer not found.');
+    if (productId && !product) throw new UserFacingError('Product not found.');
+    if (data.quantity > 0 && !productId) throw new UserFacingError('Select the product sold.');
 
-    const salesValue = input.quantity * input.unitPrice;
-
-    // Convert string status to PaymentStatus enum
-    let statusEnum: any = 'PENDING';
-    const s = input.paymentStatus.toUpperCase();
-    if (s.includes('PAID')) statusEnum = 'PAID';
-    else if (s.includes('CREDIT')) statusEnum = 'CREDIT';
-    else if (s.includes('OVERDUE')) statusEnum = 'OVERDUE';
-
-    const newVisit = await prisma.visitLog.create({
+    const visit = await prisma.visitLog.create({
       data: {
         organizationId,
         salespersonId,
-        customerId: input.customerId,
-        dateOfVisit: new Date(input.dateOfVisit),
-        visitOutcome: input.visitOutcome,
-        productId: input.productId,
-        quantity: input.quantity,
-        unitPrice: input.unitPrice,
-        salesValue,
-        paymentStatus: statusEnum,
-        nextFollowUpDate: input.nextFollowUpDate ? new Date(input.nextFollowUpDate) : null,
-        remarks: input.remarks,
+        customerId: data.customerId,
+        dateOfVisit: stringToDateColumn(data.dateOfVisit),
+        visitOutcome: data.visitOutcome,
+        productId,
+        quantity: data.quantity,
+        unitPrice: data.unitPrice,
+        salesValue: data.quantity * data.unitPrice,
+        paymentStatus: data.paymentStatus,
+        nextFollowUpDate: data.nextFollowUpDate ? stringToDateColumn(data.nextFollowUpDate) : null,
+        remarks: data.remarks || null,
       },
-      include: {
-        salesperson: { select: { name: true } },
-        customer: { select: { name: true, area: true, category: true, customerType: true } },
-        product: { select: { name: true, category: true } },
-      },
+      include: visitInclude,
     });
 
-    return {
-      success: true,
-      visit: {
-        id: newVisit.id,
-        timestamp: newVisit.createdAt.toISOString(),
-        salespersonId: newVisit.salespersonId,
-        salesperson: newVisit.salesperson.name,
-        dateOfVisit: newVisit.dateOfVisit.toISOString().split('T')[0],
-        customerId: newVisit.customerId,
-        customerName: newVisit.customer.name,
-        area: newVisit.customer.area,
-        customerCategory: newVisit.customer.category,
-        visitOutcome: newVisit.visitOutcome,
-        productId: newVisit.productId ?? undefined,
-        productCategory: newVisit.product?.name ?? newVisit.product?.category ?? 'Coffee Products',
-        quantity: newVisit.quantity,
-        unitPrice: newVisit.unitPrice,
-        salesValue: newVisit.salesValue,
-        paymentStatus: newVisit.paymentStatus,
-        customerType: newVisit.customer.customerType,
-        nextFollowUpDate: newVisit.nextFollowUpDate ? newVisit.nextFollowUpDate.toISOString().split('T')[0] : '',
-        remarks: newVisit.remarks ?? '',
+    await audit(session, 'CREATE_VISIT_LOG', 'VisitLog', visit.id, {
+      customerId: visit.customerId,
+      salesValue: visit.salesValue,
+    });
+    revalidatePath('/', 'layout');
+    return toVisitDTO(visit);
+  });
+}
+
+/** Delete a visit log. Managers may delete any; sales officers only their own. */
+export async function deleteVisitLog(visitId: string): Promise<ActionResult> {
+  return runAction('deleteVisitLog', async () => {
+    const session = await requireSession();
+    const visit = await prisma.visitLog.findFirst({
+      where: {
+        id: z.string().parse(visitId),
+        organizationId: session.organizationId,
+        ...(canViewAllReps(session) ? {} : { salespersonId: session.userId }),
       },
-    };
-  } catch (error: any) {
-    console.error('Error creating visit log via Server Action:', error);
-    return { success: false, error: 'Failed to create visit log' };
-  }
+    });
+    if (!visit) throw new UserFacingError('Visit not found.');
+
+    await prisma.visitLog.delete({ where: { id: visit.id } });
+    await audit(session, 'DELETE_VISIT_LOG', 'VisitLog', visit.id, {
+      customerId: visit.customerId,
+      dateOfVisit: visit.dateOfVisit,
+      salesValue: visit.salesValue,
+    });
+    revalidatePath('/', 'layout');
+    return undefined;
+  });
+}
+
+/** Most recent visits to one customer (for the customer detail drawer). */
+export async function getCustomerVisits(customerId: string): Promise<ActionResult<VisitLog[]>> {
+  return runAction('getCustomerVisits', async () => {
+    const session = await requireSession();
+    const customer = await prisma.customer.findFirst({
+      where: { id: z.string().parse(customerId), ...customerScope(session) },
+      select: { id: true },
+    });
+    if (!customer) throw new UserFacingError('Customer not found.');
+    return listVisits(session, { customerId: customer.id, limit: 50 });
+  });
+}
+
+const MAX_REPORT_DAYS = 366;
+
+/** Visits in a date range (inclusive), for on-demand reports. Scoped like listVisits. */
+export async function getVisitsForPeriod(from: string, to: string): Promise<ActionResult<VisitLog[]>> {
+  return runAction('getVisitsForPeriod', async () => {
+    const session = await requireSession();
+    const start = stringToDateColumn(dateString.parse(from));
+    const end = stringToDateColumn(dateString.parse(to));
+    const days = (end.getTime() - start.getTime()) / 86400000;
+    if (days < 0 || days > MAX_REPORT_DAYS) throw new UserFacingError('Choose a period of at most one year.');
+    return listVisits(session, { from, to });
+  });
 }

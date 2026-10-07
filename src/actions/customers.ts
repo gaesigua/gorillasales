@@ -1,196 +1,89 @@
 'use server';
 
+import { revalidatePath } from 'next/cache';
+import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
-import { canViewAllReps, requireSession, scopedSalespersonId } from '@/lib/tenant';
+import { canViewAllReps, requireSession } from '@/lib/tenant';
+import { audit } from '@/lib/audit';
+import { runAction, UserFacingError } from '@/lib/actionUtils';
+import { customerInclude, toCustomerDTO } from '@/lib/data/customers';
+import type { ActionResult, Customer } from '@/lib/types';
 
-export interface CustomerDTO {
-  id: string;
-  name: string;
-  code?: string;
-  category: string;
-  customerType: 'NEW_CUSTOMER' | 'EXISTING_CUSTOMER' | 'New Customer' | 'Existing Customer';
-  area: string;
-  contactPerson?: string;
-  email?: string;
-  phone?: string;
-  address?: string;
-  salespersonId?: string;
-  salespersonName?: string;
-  outstandingBalance: number;
-  creditLimit: number;
-  visitCount?: number;
-  lastVisitDate?: string;
+const optionalText = (max: number) => z.string().trim().max(max).optional().or(z.literal(''));
+
+const customerSchema = z.object({
+  name: z.string().trim().min(1, 'Customer name is required').max(200),
+  category: z.string().trim().min(1, 'Select a category').max(120),
+  customerType: z.enum(['NEW_CUSTOMER', 'EXISTING_CUSTOMER']).default('NEW_CUSTOMER'),
+  status: z.enum(['ACTIVE', 'INACTIVE', 'PROSPECT']).default('PROSPECT'),
+  area: z.string().trim().min(1, 'Area is required').max(120),
+  contactPerson: optionalText(120),
+  email: z.string().trim().email().optional().or(z.literal('')),
+  phone: optionalText(40),
+  address: optionalText(300),
+  salespersonId: z.string().optional().or(z.literal('')),
+  mainProductId: z.string().optional().or(z.literal('')),
+  monthlyPotential: z.coerce.number().min(0).default(0),
+  creditLimit: z.coerce.number().min(0).default(0),
+  remarks: optionalText(2000),
+});
+
+export type CreateCustomerInput = z.input<typeof customerSchema>;
+
+/** Next sequential customer code for the organization, e.g. CUST-0042. */
+async function nextCustomerCode(organizationId: string): Promise<string> {
+  const codes = await prisma.customer.findMany({
+    where: { organizationId, code: { startsWith: 'CUST-' } },
+    select: { code: true },
+  });
+  const max = codes.reduce((m, c) => Math.max(m, Number(c.code?.slice(5)) || 0), 0);
+  return `CUST-${String(max + 1).padStart(4, '0')}`;
 }
 
-export interface CreateCustomerInput {
-  name: string;
-  code?: string;
-  category: string;
-  customerType?: 'NEW_CUSTOMER' | 'EXISTING_CUSTOMER';
-  area: string;
-  contactPerson?: string;
-  email?: string;
-  phone?: string;
-  address?: string;
-  salespersonId?: string;
-  creditLimit?: number;
-}
+export async function createCustomer(input: CreateCustomerInput): Promise<ActionResult<Customer>> {
+  return runAction('createCustomer', async () => {
+    const session = await requireSession();
+    const { organizationId } = session;
+    const data = customerSchema.parse(input);
 
-/**
- * Fetch all customers for the current organization
- */
-export async function getCustomers(salespersonId?: string): Promise<CustomerDTO[]> {
-  const { organizationId } = await requireSession();
-  try {
-    const where: any = { organizationId };
-    if (salespersonId) {
-      where.salespersonId = salespersonId;
-    }
-
-    const dbCustomers = await prisma.customer.findMany({
-      where,
-      include: {
-        salesperson: { select: { id: true, name: true } },
-        visitLogs: {
-          orderBy: { dateOfVisit: 'desc' },
-          take: 1,
-          select: { dateOfVisit: true },
-        },
-        _count: { select: { visitLogs: true } },
-      },
-      orderBy: { name: 'asc' },
-    });
-
-    if (dbCustomers.length > 0) {
-      return dbCustomers.map((c: any) => ({
-        id: c.id,
-        name: c.name,
-        code: c.code ?? undefined,
-        category: c.category,
-        customerType: c.customerType,
-        area: c.area,
-        contactPerson: c.contactPerson ?? undefined,
-        email: c.email ?? undefined,
-        phone: c.phone ?? undefined,
-        address: c.address ?? undefined,
-        salespersonId: c.salespersonId ?? undefined,
-        salespersonName: c.salesperson?.name ?? undefined,
-        outstandingBalance: c.outstandingBalance,
-        creditLimit: c.creditLimit,
-        visitCount: c._count.visitLogs,
-        lastVisitDate: c.visitLogs[0]?.dateOfVisit ? c.visitLogs[0].dateOfVisit.toISOString().split('T')[0] : undefined,
-      }));
-    }
-  } catch (error) {
-    console.warn('⚠️ Server Action getCustomers: DB fetch failed or empty, returning fallback data.', error);
-  }
-
-  // Fallback data derived from mockData if DB is offline
-  return [
-    {
-      id: 'cust-001',
-      name: 'Nakumatt Kigali City Mall',
-      code: 'CUST-001',
-      category: 'Supermarkets',
-      customerType: 'EXISTING_CUSTOMER',
-      area: 'Kigali Centre',
-      contactPerson: 'Jean Paul Habimana',
-      phone: '+250 788 123 456',
-      salespersonName: 'Karenzi Remmy',
-      outstandingBalance: 450000,
-      creditLimit: 2000000,
-      visitCount: 14,
-      lastVisitDate: '2026-09-04',
-    },
-    {
-      id: 'cust-002',
-      name: 'Hotel des Mille Collines',
-      code: 'CUST-002',
-      category: 'Hotels',
-      customerType: 'EXISTING_CUSTOMER',
-      area: 'Kigali Centre',
-      contactPerson: 'Marie Claire Uwamahoro',
-      phone: '+250 788 654 321',
-      salespersonName: 'Mastiko Frank',
-      outstandingBalance: 312000,
-      creditLimit: 1500000,
-      visitCount: 11,
-      lastVisitDate: '2026-09-04',
-    },
-    {
-      id: 'cust-003',
-      name: 'Bourbon Coffee Kimihurura',
-      code: 'CUST-003',
-      category: 'Coffee Shops',
-      customerType: 'EXISTING_CUSTOMER',
-      area: 'Kimihurura',
-      contactPerson: 'Claudine Uwase',
-      phone: '+250 788 999 888',
-      salespersonName: 'Alex Mushumba',
-      outstandingBalance: 0,
-      creditLimit: 3000000,
-      visitCount: 10,
-      lastVisitDate: '2026-09-03',
-    },
-  ];
-}
-
-/**
- * Create a new Customer record in Prisma database
- */
-export async function createCustomer(input: CreateCustomerInput): Promise<{ success: boolean; customer?: CustomerDTO; error?: string }> {
-  const session = await requireSession();
-  const { organizationId } = session;
-  try {
-    let salespersonId = input.salespersonId ? scopedSalespersonId(session, input.salespersonId) : undefined;
-    if (!salespersonId && !canViewAllReps(session)) salespersonId = session.userId;
+    // Sales officers can only register customers for themselves
+    const salespersonId = canViewAllReps(session) ? data.salespersonId || null : session.userId;
     if (salespersonId) {
       const rep = await prisma.user.findFirst({ where: { id: salespersonId, organizationId }, select: { id: true } });
-      if (!rep) return { success: false, error: 'Salesperson not found' };
+      if (!rep) throw new UserFacingError('Salesperson not found.');
+    }
+    if (data.mainProductId) {
+      const product = await prisma.product.findFirst({
+        where: { id: data.mainProductId, organizationId },
+        select: { id: true },
+      });
+      if (!product) throw new UserFacingError('Product not found.');
     }
 
-    const newCustomer = await prisma.customer.create({
+    const customer = await prisma.customer.create({
       data: {
         organizationId,
-        name: input.name,
-        code: input.code ?? `CUST-${Date.now().toString().slice(-4)}`,
-        category: input.category,
-        customerType: (input.customerType as any) ?? 'EXISTING_CUSTOMER',
-        area: input.area,
-        contactPerson: input.contactPerson,
-        email: input.email,
-        phone: input.phone,
-        address: input.address,
+        code: await nextCustomerCode(organizationId),
+        name: data.name,
+        category: data.category,
+        customerType: data.customerType,
+        status: data.status,
+        area: data.area,
+        contactPerson: data.contactPerson || null,
+        email: data.email || null,
+        phone: data.phone || null,
+        address: data.address || null,
         salespersonId,
-        creditLimit: input.creditLimit ?? 0,
+        mainProductId: data.mainProductId || null,
+        monthlyPotential: data.monthlyPotential,
+        creditLimit: data.creditLimit,
+        remarks: data.remarks || null,
       },
-      include: {
-        salesperson: { select: { id: true, name: true } },
-      },
+      include: customerInclude,
     });
 
-    return {
-      success: true,
-      customer: {
-        id: newCustomer.id,
-        name: newCustomer.name,
-        code: newCustomer.code ?? undefined,
-        category: newCustomer.category,
-        customerType: newCustomer.customerType,
-        area: newCustomer.area,
-        contactPerson: newCustomer.contactPerson ?? undefined,
-        email: newCustomer.email ?? undefined,
-        phone: newCustomer.phone ?? undefined,
-        address: newCustomer.address ?? undefined,
-        salespersonId: newCustomer.salespersonId ?? undefined,
-        salespersonName: newCustomer.salesperson?.name ?? undefined,
-        outstandingBalance: newCustomer.outstandingBalance,
-        creditLimit: newCustomer.creditLimit,
-        visitCount: 0,
-      },
-    };
-  } catch (error: any) {
-    console.error('Error creating customer via Server Action:', error);
-    return { success: false, error: 'Failed to create customer' };
-  }
+    await audit(session, 'CREATE_CUSTOMER', 'Customer', customer.id, { name: customer.name, code: customer.code });
+    revalidatePath('/', 'layout');
+    return toCustomerDTO(customer);
+  });
 }

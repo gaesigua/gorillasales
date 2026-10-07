@@ -1,19 +1,135 @@
-import { PrismaClient, UserRole, PaymentStatus, CustomerType, FieldType } from '@prisma/client';
-
+// Demo data for local development: one organization (Gorilla Coffee), its team, catalogue,
+// customers, pipeline, targets and ~6 months of generated visit history dated relative to
+// today, so dashboards and reports have realistic numbers.
+//
+//   SEED_USER_PASSWORD=...  initial password for every seeded user (required, min 10 chars)
+//   SEED_ALLOW_RESET=yes    required when the database already has data: the seed WIPES it
+//
+// Never run this against a production database.
+import { PrismaClient, UserRole, PaymentStatus, CustomerType, CustomerStatus, FieldType, LookupType } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
+
+// Deterministic pseudo-random numbers so every seed run produces the same data
+function mulberry32(seed: number) {
+  return () => {
+    seed |= 0;
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+const rand = mulberry32(20260907);
+const randInt = (min: number, max: number) => Math.floor(rand() * (max - min + 1)) + min;
+const pick = <T,>(items: T[]): T => items[Math.floor(rand() * items.length)];
+
+function kigaliToday(): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Kigali' }).format(new Date());
+}
+const dateCol = (s: string) => new Date(`${s}T00:00:00.000Z`);
+function addDays(s: string, days: number): string {
+  const d = dateCol(s);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+const TEAM = [
+  { name: 'Mugabe Eric', email: 'eric.m@gorillacoffee.rw', role: UserRole.MANAGER, code: 'GS-MGR-001', area: 'Kigali' },
+  { name: 'Umwari Lilian', email: 'lilian.u@gorillacoffee.rw', role: UserRole.ADMIN, code: 'GS-ADM-001', area: 'Head Office' },
+  { name: 'Karenzi Remmy', email: 'remmy.k@gorillacoffee.rw', role: UserRole.SALES_OFFICER, code: 'GS-OFF-001', area: 'Kigali Centre' },
+  { name: 'Alex Mushumba', email: 'alex.m@gorillacoffee.rw', role: UserRole.SALES_OFFICER, code: 'GS-OFF-002', area: 'Kimihurura / Kacyiru' },
+  { name: 'Isimbi Patience', email: 'patience.i@gorillacoffee.rw', role: UserRole.SALES_OFFICER, code: 'GS-OFF-003', area: 'Remera / Nyarutarama' },
+  { name: 'Mastiko Frank', email: 'frank.m@gorillacoffee.rw', role: UserRole.SALES_OFFICER, code: 'GS-OFF-004', area: 'Gisozi / Nyamirambo' },
+  { name: 'Muyenzi Dan', email: 'dan.m@gorillacoffee.rw', role: UserRole.SALES_OFFICER, code: 'GS-OFF-005', area: 'Nyabugogo / Kiyovu' },
+  { name: 'Herve Ndayisaba', email: 'herve.n@gorillacoffee.rw', role: UserRole.DELIVERY_SUPPORT, code: 'GS-DEL-001', area: 'Warehouse' },
+  { name: 'Gakuba Samson', email: 'samson.g@gorillacoffee.rw', role: UserRole.DRIVER, code: 'GS-DRV-001', area: 'Kigali' },
+];
+
+const MONTHLY_TARGETS: Record<string, number> = {
+  'Karenzi Remmy': 4000000,
+  'Mastiko Frank': 3500000,
+  'Isimbi Patience': 3200000,
+  'Alex Mushumba': 3800000,
+  'Muyenzi Dan': 3600000,
+};
+
+const CATEGORIES = ['Hotels', 'Coffee Shops', 'Wholesalers', 'Supermarkets', 'Shops', 'Stores', 'Galleries', 'Offices'];
+const OUTCOMES = { order: 'Order Placed', visit: 'No Order / Visit Only', followUp: 'Follow-up Required' };
+
+const PRODUCTS = [
+  { name: '250G Roasted Coffee', sku: 'RC-250', category: 'Roasted Coffee', unitPrice: 2600, unitOfMeasure: 'Pack', weightKg: 0.25 },
+  { name: '500G MG', sku: 'MG-500', category: 'Roasted Coffee', unitPrice: 4800, unitOfMeasure: 'Pack', weightKg: 0.5 },
+  { name: '1KG Roasted Coffee', sku: 'RC-1000', category: 'Roasted Coffee', unitPrice: 9000, unitOfMeasure: 'KG', weightKg: 1 },
+  { name: 'Instant Coffee Sachets', sku: 'IN-BOX', category: 'Instant', unitPrice: 1500, unitOfMeasure: 'Box', weightKg: 0.1 },
+  { name: 'Green Coffee Beans', sku: 'GR-1000', category: 'Green Coffee', unitPrice: 7500, unitOfMeasure: 'KG', weightKg: 1 },
+  { name: 'Coffee Pods 10-pack', sku: 'POD-10', category: 'Pods', unitPrice: 3500, unitOfMeasure: 'Pack', weightKg: 0.07 },
+];
+
+// name | category | area | contact | phone | rep | main product | monthly potential | status | remarks | new this month
+const CUSTOMERS: [string, string, string, string, string, string, string, number, CustomerStatus, string, boolean][] = [
+  ['Nakumatt Kigali City Mall', 'Supermarkets', 'Kigali Centre', 'Jean-Pierre Habiyaremye', '+250 788 123 456', 'Karenzi Remmy', '500G MG', 800000, 'ACTIVE', 'Key account — priority service', false],
+  ['Hotel des Mille Collines', 'Hotels', 'Kigali Centre', 'Solange Niyonkuru', '+250 788 234 567', 'Mastiko Frank', '250G Roasted Coffee', 600000, 'ACTIVE', 'Monthly standing order — very reliable', false],
+  ['Simba Supermarket Remera', 'Supermarkets', 'Remera', 'Emmanuel Rukundo', '+250 788 345 678', 'Isimbi Patience', '1KG Roasted Coffee', 700000, 'ACTIVE', 'Manager transitions — follow up urgently', false],
+  ['Bourbon Coffee Kimihurura', 'Coffee Shops', 'Kimihurura', 'Claudine Uwase', '+250 788 456 789', 'Alex Mushumba', 'Coffee Pods 10-pack', 900000, 'ACTIVE', 'Exclusive pod supply under discussion', false],
+  ['Kigali Wholesale Hub', 'Wholesalers', 'Nyabugogo', 'Théophile Nkurunziza', '+250 788 567 890', 'Muyenzi Dan', 'Green Coffee Beans', 1200000, 'ACTIVE', 'New account — 30-day credit terms', true],
+  ['Marriott Kigali', 'Hotels', 'Kigali Centre', 'Bertrand Gasana', '+250 788 678 901', 'Karenzi Remmy', '250G Roasted Coffee', 1000000, 'ACTIVE', 'Premium account — quarterly contract renewal due', false],
+  ['Quickmart Gisozi', 'Supermarkets', 'Gisozi', 'Anitha Uwimana', '+250 788 789 012', 'Mastiko Frank', 'Instant Coffee Sachets', 500000, 'PROSPECT', 'Needs pricing sheet — very promising location', true],
+  ['Café Botanika', 'Coffee Shops', 'Nyarutarama', 'Miriam Ingabire', '+250 788 890 123', 'Isimbi Patience', '500G MG', 400000, 'ACTIVE', 'New account — high growth potential', true],
+  ['Chez Lando Restaurant', 'Coffee Shops', 'Kacyiru', 'Lando Nshimiyimana', '+250 788 901 234', 'Alex Mushumba', '250G Roasted Coffee', 350000, 'ACTIVE', 'Stock check needed', false],
+  ['Ikirezi Natural Products', 'Shops', 'Kiyovu', 'Vestine Mukamazimpaka', '+250 788 012 345', 'Muyenzi Dan', 'Instant Coffee Sachets', 480000, 'ACTIVE', '', false],
+  ['Radisson Blu Kigali', 'Hotels', 'Kigali Centre', 'Christophe Murenzi', '+250 788 111 222', 'Karenzi Remmy', '250G Roasted Coffee', 1100000, 'ACTIVE', 'Annual contract under negotiation', false],
+  ['Nyamirambo Corner Store', 'Stores', 'Nyamirambo', 'Odette Kabasinga', '+250 788 333 444', 'Mastiko Frank', '250G Roasted Coffee', 200000, 'INACTIVE', 'Inactive — re-engagement needed', false],
+  ['Kigali Convention Centre', 'Hotels', 'Kimihurura', 'Events Procurement', '+250 788 444 555', 'Mastiko Frank', '1KG Roasted Coffee', 1500000, 'PROSPECT', 'Event catering supply', false],
+  ['MTN Rwanda HQ Canteen', 'Offices', 'Nyarutarama', 'Canteen Manager', '+250 788 555 666', 'Isimbi Patience', '500G MG', 600000, 'PROSPECT', 'Corporate canteen — high volume daily', true],
+];
+
+// customer | potential value | stage | next action | follow-up in N days | remarks
+const DEALS: [string, number, string, string, number, string][] = [
+  ['Radisson Blu Kigali', 2400000, 'Proposal', 'Send updated pricing proposal', 4, 'Annual contract — high value'],
+  ['Kigali Convention Centre', 3600000, 'Closing', 'Final contract sign-off', 2, 'Event catering supply — near close'],
+  ['Kigali Wholesale Hub', 5000000, 'Contacted', 'Arrange product tasting session', 10, 'Large volume — needs credit facility approval'],
+  ['MTN Rwanda HQ Canteen', 1800000, 'Prospecting', 'Initial intro meeting', 21, 'Corporate canteen — high volume daily'],
+  ['Bourbon Coffee Kimihurura', 4200000, 'Proposal', 'Present exclusive supply agreement', 35, 'Exclusive pod deal — high strategic value'],
+  ['Quickmart Gisozi', 900000, 'Contacted', 'Share pricing sheet', -3, 'Promising location'],
+  ['Marriott Kigali', 3000000, 'Won', 'Schedule first delivery', 0, 'Quarterly contract renewed'],
+];
+
+const STAGES = [
+  { name: 'Prospecting', probability: 20, color: '#94A3B8' },
+  { name: 'Contacted', probability: 40, color: '#60A5FA' },
+  { name: 'Proposal', probability: 65, color: '#FBBF24' },
+  { name: 'Closing', probability: 85, color: '#F97316' },
+  { name: 'Won', probability: 100, color: '#22C55E' },
+  { name: 'Lost', probability: 0, color: '#EF4444' },
+];
+
+// Order sizes by channel (units per order)
+const ORDER_QTY: Record<string, [number, number]> = {
+  Wholesalers: [80, 200],
+  Supermarkets: [40, 120],
+  Hotels: [30, 90],
+  Offices: [20, 60],
+  'Coffee Shops': [15, 50],
+  Shops: [10, 30],
+  Stores: [10, 30],
+};
 
 async function main() {
   const seedPassword = process.env.SEED_USER_PASSWORD;
   if (!seedPassword || seedPassword.length < 10) {
     throw new Error('Set SEED_USER_PASSWORD (min 10 chars) — it becomes the initial password of every seeded user.');
   }
+  if ((await prisma.organization.count()) > 0 && process.env.SEED_ALLOW_RESET !== 'yes') {
+    throw new Error('Database already has data. Re-run with SEED_ALLOW_RESET=yes to WIPE it and reseed.');
+  }
   const passwordHash = await bcrypt.hash(seedPassword, 12);
+  const today = kigaliToday();
 
-  console.log('🌱 Starting GorillaSales Enterprise Database Seeding...');
+  console.log('🌱 Seeding GorillaSales demo data...');
 
-  // 1. Clean existing records (Optional for idempotency)
+  // 1. Wipe (children first)
   await prisma.auditLog.deleteMany();
   await prisma.customFieldValue.deleteMany();
   await prisma.customFieldDefinition.deleteMany();
@@ -22,357 +138,190 @@ async function main() {
   await prisma.pipelineStage.deleteMany();
   await prisma.monthlyTarget.deleteMany();
   await prisma.commissionRule.deleteMany();
-  await prisma.product.deleteMany();
+  await prisma.lookupValue.deleteMany();
   await prisma.customer.deleteMany();
+  await prisma.product.deleteMany();
   await prisma.user.deleteMany();
   await prisma.organization.deleteMany();
 
-  // 2. Create Default Tenant Organization
+  // 2. Organization
   const org = await prisma.organization.create({
-    data: {
-      name: 'Gorilla Coffee Distribution Ltd',
-      slug: 'gorilla-coffee',
-      currency: 'RWF',
-      timezone: 'Africa/Kigali',
-    },
+    data: { name: 'Gorilla Coffee Distribution Ltd', slug: 'gorilla-coffee', currency: 'RWF', timezone: 'Africa/Kigali' },
   });
+  const organizationId = org.id;
 
-  console.log(`✅ Organization created: ${org.name} (${org.id})`);
-
-  // 3. Create Users & Sales Team
-  const manager = await prisma.user.create({
-    data: {
-      organizationId: org.id,
-      email: 'eric.m@gorillacoffee.rw',
-      name: 'Mugabe Eric',
-      initials: 'ME',
-      passwordHash,
-      role: UserRole.MANAGER,
-    },
-  });
-
-  const repRemmy = await prisma.user.create({
-    data: {
-      organizationId: org.id,
-      email: 'remmy.k@gorillacoffee.rw',
-      name: 'Karenzi Remmy',
-      initials: 'KR',
-      passwordHash,
-      role: UserRole.SALES_OFFICER,
-    },
-  });
-
-  const repAlex = await prisma.user.create({
-    data: {
-      organizationId: org.id,
-      email: 'alex.m@gorillacoffee.rw',
-      name: 'Alex Mushumba',
-      initials: 'AM',
-      passwordHash,
-      role: UserRole.SALES_OFFICER,
-    },
-  });
-
-  const repPatience = await prisma.user.create({
-    data: {
-      organizationId: org.id,
-      email: 'patience.i@gorillacoffee.rw',
-      name: 'Isimbi Patience',
-      initials: 'IP',
-      passwordHash,
-      role: UserRole.SALES_OFFICER,
-    },
-  });
-
-  const repFrank = await prisma.user.create({
-    data: {
-      organizationId: org.id,
-      email: 'frank.m@gorillacoffee.rw',
-      name: 'Mastiko Frank',
-      initials: 'MF',
-      passwordHash,
-      role: UserRole.SALES_OFFICER,
-    },
-  });
-
-  const repDan = await prisma.user.create({
-    data: {
-      organizationId: org.id,
-      email: 'dan.m@gorillacoffee.rw',
-      name: 'Muyenzi Dan',
-      initials: 'MD',
-      passwordHash,
-      role: UserRole.SALES_OFFICER,
-    },
-  });
-
-  console.log(`✅ Users created: Manager + 5 Sales Officers`);
-
-  // 4. Products Catalog
-  const prod250g = await prisma.product.create({
-    data: {
-      organizationId: org.id,
-      name: '250G Roasted Coffee',
-      sku: 'COF-250G',
-      category: 'Roasted Coffee',
-      unitPrice: 2600,
-      unitOfMeasure: 'Pack',
-    },
-  });
-
-  const prod500g = await prisma.product.create({
-    data: {
-      organizationId: org.id,
-      name: '500G Medium Ground (MG)',
-      sku: 'COF-500G-MG',
-      category: 'Roasted Coffee',
-      unitPrice: 4800,
-      unitOfMeasure: 'Pack',
-    },
-  });
-
-  const prod1kg = await prisma.product.create({
-    data: {
-      organizationId: org.id,
-      name: '1KG Roasted Coffee Beans',
-      sku: 'COF-1KG-BEAN',
-      category: 'Roasted Coffee',
-      unitPrice: 9000,
-      unitOfMeasure: 'KG',
-    },
-  });
-
-  console.log(`✅ Products catalog created`);
-
-  // 5. Customers CRM
-  const custNakumatt = await prisma.customer.create({
-    data: {
-      organizationId: org.id,
-      name: 'Nakumatt Kigali City Mall',
-      code: 'CUST-001',
-      category: 'Supermarkets',
-      customerType: CustomerType.EXISTING_CUSTOMER,
-      area: 'Kigali Centre',
-      contactPerson: 'Jean Paul Habimana',
-      email: 'jp.habimana@nakumatt.rw',
-      phone: '+250 788 123 456',
-      salespersonId: repRemmy.id,
-      outstandingBalance: 450000,
-      creditLimit: 2000000,
-    },
-  });
-
-  const custMilleCollines = await prisma.customer.create({
-    data: {
-      organizationId: org.id,
-      name: 'Hotel des Mille Collines',
-      code: 'CUST-002',
-      category: 'Hotels',
-      customerType: CustomerType.EXISTING_CUSTOMER,
-      area: 'Kigali Centre',
-      contactPerson: 'Marie Claire Uwamahoro',
-      email: 'procurement@millecollines.rw',
-      phone: '+250 788 654 321',
-      salespersonId: repFrank.id,
-      outstandingBalance: 312000,
-      creditLimit: 1500000,
-    },
-  });
-
-  const custBourbon = await prisma.customer.create({
-    data: {
-      organizationId: org.id,
-      name: 'Bourbon Coffee Kimihurura',
-      code: 'CUST-003',
-      category: 'Coffee Shops',
-      customerType: CustomerType.EXISTING_CUSTOMER,
-      area: 'Kimihurura',
-      contactPerson: 'Claudine Uwase',
-      email: 'claudine@bourboncoffee.rw',
-      phone: '+250 788 999 888',
-      salespersonId: repAlex.id,
-      outstandingBalance: 0,
-      creditLimit: 3000000,
-    },
-  });
-
-  console.log(`✅ Customers created`);
-
-  // 6. Pipeline Stages & Deals
-  const stageLead = await prisma.pipelineStage.create({
-    data: { organizationId: org.id, name: 'Lead', probability: 10, sortOrder: 1, color: '#94A3B8' },
-  });
-  const stageContacted = await prisma.pipelineStage.create({
-    data: { organizationId: org.id, name: 'Contacted', probability: 25, sortOrder: 2, color: '#3B82F6' },
-  });
-  const stageProposal = await prisma.pipelineStage.create({
-    data: { organizationId: org.id, name: 'Proposal Sent', probability: 40, sortOrder: 3, color: '#8B5CF6' },
-  });
-  const stageClosing = await prisma.pipelineStage.create({
-    data: { organizationId: org.id, name: 'Closing', probability: 80, sortOrder: 4, color: '#F59E0B' },
-  });
-  const stageWon = await prisma.pipelineStage.create({
-    data: { organizationId: org.id, name: 'Won', probability: 100, sortOrder: 5, color: '#10B981' },
-  });
-
-  await prisma.pipelineDeal.create({
-    data: {
-      organizationId: org.id,
-      title: 'Radisson Blu Annual Coffee Supply Contract',
-      customerId: custMilleCollines.id,
-      salespersonId: repRemmy.id,
-      stageId: stageProposal.id,
-      potentialValue: 2400000,
-      probability: 40,
-      weightedValue: 960000,
-      nextAction: 'Send updated pricing proposal',
-      followUpDate: new Date('2026-09-30'),
-      remarks: 'High strategic hotel client',
-    },
-  });
-
-  await prisma.pipelineDeal.create({
-    data: {
-      organizationId: org.id,
-      title: 'Bourbon Coffee Pods Supply Deal',
-      customerId: custBourbon.id,
-      salespersonId: repAlex.id,
-      stageId: stageClosing.id,
-      potentialValue: 4200000,
-      probability: 80,
-      weightedValue: 3360000,
-      nextAction: 'Final contract signature',
-      followUpDate: new Date('2026-10-05'),
-      remarks: 'Exclusive coffee pods distribution',
-    },
-  });
-
-  console.log(`✅ Pipeline stages & deals created`);
-
-  // 7. Visit Logs
-  await prisma.visitLog.create({
-    data: {
-      organizationId: org.id,
-      salespersonId: repRemmy.id,
-      customerId: custNakumatt.id,
-      dateOfVisit: new Date('2026-09-04'),
-      visitOutcome: 'Order Placed',
-      productId: prod500g.id,
-      quantity: 48,
-      unitPrice: 4800,
-      salesValue: 230400,
-      paymentStatus: PaymentStatus.PAID,
-      remarks: 'Increased order volume by 20%',
-    },
-  });
-
-  await prisma.visitLog.create({
-    data: {
-      organizationId: org.id,
-      salespersonId: repFrank.id,
-      customerId: custMilleCollines.id,
-      dateOfVisit: new Date('2026-09-04'),
-      visitOutcome: 'Order Placed',
-      productId: prod250g.id,
-      quantity: 120,
-      unitPrice: 2600,
-      salesValue: 312000,
-      paymentStatus: PaymentStatus.CREDIT,
-      remarks: 'Monthly standing order confirmed',
-    },
-  });
-
-  console.log(`✅ Visit logs created`);
-
-  // 8. Monthly Targets
-  const currentMonth = new Date().getMonth();
-  const currentYear = new Date().getFullYear();
-
-  const reps = [repRemmy, repAlex, repPatience, repFrank, repDan];
-  const targets = [4000000, 3800000, 3200000, 3500000, 3600000];
-  const weightTargets = [500, 480, 400, 440, 450];
-
-  for (let i = 0; i < reps.length; i++) {
-    await prisma.monthlyTarget.create({
+  // 3. Team
+  const users = new Map<string, string>();
+  for (const member of TEAM) {
+    const user = await prisma.user.create({
       data: {
-        organizationId: org.id,
-        salespersonId: reps[i].id,
-        month: currentMonth,
-        year: currentYear,
-        targetAmount: targets[i],
-        targetWeightKg: weightTargets[i],
+        organizationId,
+        email: member.email,
+        name: member.name,
+        initials: member.name.split(' ').map((p) => p[0]).join('').slice(0, 2).toUpperCase(),
+        role: member.role,
+        employeeCode: member.code,
+        area: member.area,
+        phone: `+250 788 ${randInt(100, 999)} ${randInt(100, 999)}`,
+        passwordHash,
+        createdAt: dateCol(addDays(today, -400)),
+      },
+    });
+    users.set(member.name, user.id);
+  }
+  const userId = (name: string) => users.get(name)!;
+
+  // 4. Lookup lists
+  await prisma.lookupValue.createMany({
+    data: [
+      ...CATEGORIES.map((label, i) => ({ organizationId, type: LookupType.CUSTOMER_CATEGORY, label, sortOrder: i + 1 })),
+      ...Object.values(OUTCOMES).map((label, i) => ({ organizationId, type: LookupType.VISIT_OUTCOME, label, sortOrder: i + 1 })),
+    ],
+  });
+
+  // 5. Products
+  const products = new Map<string, { id: string; unitPrice: number }>();
+  for (const p of PRODUCTS) {
+    const product = await prisma.product.create({ data: { organizationId, ...p } });
+    products.set(p.name, { id: product.id, unitPrice: p.unitPrice });
+  }
+
+  // 6. Customers
+  const customers: { id: string; name: string; category: string; repId: string; productName: string; status: CustomerStatus }[] = [];
+  for (const [i, c] of CUSTOMERS.entries()) {
+    const [name, category, area, contactPerson, phone, rep, mainProduct, monthlyPotential, status, remarks, isNew] = c;
+    const customer = await prisma.customer.create({
+      data: {
+        organizationId,
+        code: `CUST-${String(i + 1).padStart(4, '0')}`,
+        name,
+        category,
+        area,
+        contactPerson,
+        phone,
+        salespersonId: userId(rep),
+        mainProductId: products.get(mainProduct)!.id,
+        monthlyPotential,
+        creditLimit: monthlyPotential * 2,
+        status,
+        customerType: isNew ? CustomerType.NEW_CUSTOMER : CustomerType.EXISTING_CUSTOMER,
+        remarks: remarks || null,
+        createdAt: isNew ? dateCol(addDays(today, -randInt(1, 5))) : dateCol(addDays(today, -randInt(200, 500))),
+      },
+    });
+    customers.push({ id: customer.id, name, category, repId: userId(rep), productName: mainProduct, status });
+  }
+
+  // 7. Pipeline
+  const stages = new Map<string, string>();
+  for (const [i, s] of STAGES.entries()) {
+    const stage = await prisma.pipelineStage.create({ data: { organizationId, ...s, sortOrder: i + 1 } });
+    stages.set(s.name, stage.id);
+  }
+  for (const [customerName, potentialValue, stage, nextAction, followUpIn, remarks] of DEALS) {
+    const customer = customers.find((c) => c.name === customerName)!;
+    await prisma.pipelineDeal.create({
+      data: {
+        organizationId,
+        title: `${customerName} — supply agreement`,
+        customerId: customer.id,
+        salespersonId: customer.repId,
+        stageId: stages.get(stage)!,
+        potentialValue,
+        nextAction,
+        followUpDate: dateCol(addDays(today, followUpIn)),
+        lastContact: dateCol(addDays(today, -randInt(1, 10))),
+        remarks,
       },
     });
   }
 
-  console.log(`✅ Monthly targets seeded`);
+  // 8. Targets: last 5 months, this month and next month
+  const [ty, tm] = today.split('-').map(Number);
+  for (let offset = -5; offset <= 1; offset++) {
+    const d = new Date(Date.UTC(ty, tm - 1 + offset, 1));
+    for (const [rep, amount] of Object.entries(MONTHLY_TARGETS)) {
+      await prisma.monthlyTarget.create({
+        data: {
+          organizationId,
+          salespersonId: userId(rep),
+          month: d.getUTCMonth(),
+          year: d.getUTCFullYear(),
+          targetAmount: amount,
+          targetWeightKg: Math.round(amount / 9000),
+        },
+      });
+    }
+  }
 
-  // 9. Commission Rules
+  // 9. Visit history: ~6 months up to today, roughly 3 visits per rep per week
+  const productNames = [...products.keys()];
+  const activeCustomers = customers.filter((c) => c.status !== 'INACTIVE');
+  const startDate = addDays(`${new Date(Date.UTC(ty, tm - 6, 1)).toISOString().slice(0, 7)}-01`, 0);
+  const visits = [];
+  for (let day = startDate; day <= today; day = addDays(day, 1)) {
+    if (dateCol(day).getUTCDay() === 0) continue; // no Sunday visits
+    for (const repName of Object.keys(MONTHLY_TARGETS)) {
+      if (rand() > 0.55) continue;
+      const repCustomers = activeCustomers.filter((c) => c.repId === userId(repName));
+      if (repCustomers.length === 0) continue;
+      const customer = pick(repCustomers);
+      const roll = rand();
+      const isOrder = customer.status === 'ACTIVE' && roll < 0.7;
+      const needsFollowUp = !isOrder && roll < 0.85;
+      const productName = isOrder ? (rand() < 0.6 ? customer.productName : pick(productNames)) : null;
+      const product = productName ? products.get(productName)! : null;
+      const [minQty, maxQty] = ORDER_QTY[customer.category] ?? [10, 40];
+      const quantity = isOrder ? randInt(minQty, maxQty) : 0;
+      const unitPrice = product ? product.unitPrice : 0;
+      visits.push({
+        organizationId,
+        salespersonId: userId(repName),
+        customerId: customer.id,
+        dateOfVisit: dateCol(day),
+        visitOutcome: isOrder ? OUTCOMES.order : needsFollowUp ? OUTCOMES.followUp : OUTCOMES.visit,
+        productId: product?.id ?? null,
+        quantity,
+        unitPrice,
+        salesValue: quantity * unitPrice,
+        paymentStatus: isOrder ? pick([PaymentStatus.PAID, PaymentStatus.PAID, PaymentStatus.CREDIT, PaymentStatus.PENDING]) : PaymentStatus.PENDING,
+        nextFollowUpDate: needsFollowUp ? dateCol(addDays(day, randInt(3, 14))) : null,
+        remarks: needsFollowUp ? 'Follow up on pricing and stock levels' : null,
+        createdAt: new Date(`${day}T08:00:00.000Z`),
+      });
+    }
+  }
+  await prisma.visitLog.createMany({ data: visits });
+
+  // 10. Commission rules
   await prisma.commissionRule.createMany({
     data: [
-      {
-        organizationId: org.id,
-        name: 'Base Commission',
-        ruleType: 'percentage',
-        value: 2.0,
-        thresholdPct: 0,
-        description: 'Earned on all sales regardless of target',
-        sortOrder: 1,
-      },
-      {
-        organizationId: org.id,
-        name: 'Target Achievement Bonus',
-        ruleType: 'percentage',
-        value: 3.0,
-        thresholdPct: 100,
-        description: 'Extra % bonus when monthly target is 100% achieved',
-        sortOrder: 2,
-      },
-      {
-        organizationId: org.id,
-        name: 'Top Performer Flat Bonus',
-        ruleType: 'flat',
-        value: 50000,
-        thresholdPct: 150,
-        description: 'Flat RWF 50,000 bonus for 150%+ achievement',
-        sortOrder: 3,
-      },
+      { organizationId, name: 'Base Commission', ruleType: 'percentage', value: 2, thresholdPct: 0, description: 'Earned on all sales regardless of target', sortOrder: 1 },
+      { organizationId, name: 'Target Bonus', ruleType: 'percentage', value: 3, thresholdPct: 100, description: 'Extra % when monthly target is fully met', sortOrder: 2 },
+      { organizationId, name: 'Stretch Bonus', ruleType: 'percentage', value: 1.5, thresholdPct: 120, description: 'Additional % for exceeding target by 20%', sortOrder: 3 },
+      { organizationId, name: 'Top Performer Bonus', ruleType: 'flat', value: 50000, thresholdPct: 150, description: 'Flat RWF bonus for 150%+ achievement', sortOrder: 4 },
     ],
   });
 
-  console.log(`✅ Commission rules created`);
-
-  // 10. Twenty CRM-style Custom Fields Demonstration
-  const customRoasterField = await prisma.customFieldDefinition.create({
+  // 11. Example custom field
+  await prisma.customFieldDefinition.create({
     data: {
-      organizationId: org.id,
+      organizationId,
       entityType: 'CUSTOMER',
       name: 'Coffee Machine Type',
       fieldKey: 'coffee_machine_type',
       fieldType: FieldType.SELECT,
-      options: ['Commercial Espresso', 'Filter Brewer', 'Pod Machine', 'Manual Pour-over'],
-      isRequired: false,
-      sortOrder: 1,
+      options: ['Espresso', 'Filter', 'Capsule', 'None'],
     },
   });
 
-  await prisma.customFieldValue.create({
-    data: {
-      organizationId: org.id,
-      entityType: 'CUSTOMER',
-      entityId: custBourbon.id,
-      fieldDefinitionId: customRoasterField.id,
-      value: 'Commercial Espresso',
-    },
-  });
-
-  console.log(`✅ Dynamic custom fields configured and attached`);
-  console.log('🎉 GorillaSales Database Seeding Completed Successfully!');
+  console.log(`✅ Seeded ${TEAM.length} users, ${customers.length} customers, ${DEALS.length} deals, ${visits.length} visits.`);
+  console.log('   Log in with any seeded email (e.g. eric.m@gorillacoffee.rw) and SEED_USER_PASSWORD.');
 }
 
 main()
   .catch((e) => {
-    console.error('❌ Error Seeding Database:', e);
+    console.error('❌ Seeding failed:', e.message ?? e);
     process.exit(1);
   })
   .finally(async () => {

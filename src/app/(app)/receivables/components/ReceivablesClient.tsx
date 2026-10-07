@@ -2,7 +2,6 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
 import { formatRWF, formatRWFFull } from '@/lib/format';
 import { AGING_LABELS, type AgingBucket } from '@/lib/domain/receivables';
@@ -164,7 +163,7 @@ export default function ReceivablesClient({ invoices: initial, aging, creditNote
           ))}
         </select>
         <div className="relative">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}

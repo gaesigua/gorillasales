@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X } from 'lucide-react';
 import { useConfig } from '@/context/ConfigContext';
 import { createDeliveryRun, setRunStops } from '@/actions/deliveries';
 import { formatRWFFull } from '@/lib/format';
@@ -65,7 +64,7 @@ export default function PlanRunModal({ run, queue, drivers, today, onClose, onSa
         <div className="sticky top-0 bg-card border-b border-border px-5 py-3 flex items-center justify-between z-10">
           <h2 className="font-semibold">{run ? `Change stops — ${run.runNumber}` : 'Plan Delivery Run'}</h2>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted" aria-label="Close">
-            <X size={18} />
+            Close
           </button>
         </div>
         <div className="p-5 space-y-4">

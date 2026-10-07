@@ -4,7 +4,6 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
-import { Loader2, CheckCircle } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
 import { formatRWFFull } from '@/lib/format';
 import { useConfig } from '@/context/ConfigContext';
@@ -54,6 +53,7 @@ export default function SalesEntryForm({ customers, priceBook, today, preset }: 
     watch,
     reset,
     setValue,
+    setFocus,
     formState: { errors },
   } = useForm<VisitFormData>({ defaultValues: emptyForm });
 
@@ -100,6 +100,8 @@ export default function SalesEntryForm({ customers, priceBook, today, preset }: 
         setSubmitSuccess(false);
         reset({ ...emptyForm, salespersonId: data.salespersonId, dateOfVisit: data.dateOfVisit });
         setLines([emptyLine()]);
+        // Ready for the next visit: same rep and date, cursor on Customer
+        setFocus('customerId');
       }, 1500);
     } finally {
       setIsSubmitting(false);
@@ -107,27 +109,37 @@ export default function SalesEntryForm({ customers, priceBook, today, preset }: 
   };
 
   const inputClass =
-    'w-full bg-input border border-border rounded-lg px-4 py-3 text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-colors';
+    'w-full bg-input border border-border rounded-lg px-2 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-colors';
   const selectClass =
-    'w-full bg-input border border-border rounded-lg px-4 py-3 text-base text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-colors cursor-pointer';
+    'w-full bg-input border border-border rounded-lg px-2 py-1.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-colors cursor-pointer';
   const readOnlyClass =
-    'w-full bg-muted/40 border border-border rounded-lg px-4 py-3 text-base text-muted-foreground';
-  const labelClass = 'block text-sm font-semibold text-foreground mb-2 tracking-wide';
+    'w-full bg-muted border border-border px-2 py-1.5 text-sm text-muted-foreground';
+  const labelClass = 'block text-sm font-bold text-foreground mb-1';
   const errorClass = 'text-xs text-negative mt-1.5';
   const helperClass = 'text-xs text-muted-foreground mt-1.5';
 
   return (
     <>
       <Toaster position="bottom-right" richColors />
-      <form onSubmit={handleSubmit(onSubmit)} noValidate>
+      <form
+        onSubmit={handleSubmit(onSubmit)}
+        onKeyDown={(e) => {
+          // Ctrl+Enter / Cmd+Enter saves from any field
+          if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+            e.preventDefault();
+            void handleSubmit(onSubmit)();
+          }
+        }}
+        noValidate
+      >
         {/* Section: Visit Details */}
         <div className="bg-card border border-border rounded-xl overflow-hidden mb-4">
-          <div className="px-5 py-3 bg-muted/40 border-b border-border">
-            <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+          <div className="px-3 py-1 bg-[var(--table-head)] border-b border-border">
+            <h3 className="text-sm font-bold text-foreground">
               Visit Details
             </h3>
           </div>
-          <div className="p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          <div className="p-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {/* Salesperson: managers choose, officers always log as themselves */}
             <div>
               <label className={labelClass} htmlFor="salespersonId">
@@ -191,12 +203,12 @@ export default function SalesEntryForm({ customers, priceBook, today, preset }: 
 
         {/* Section: Customer */}
         <div className="bg-card border border-border rounded-xl overflow-hidden mb-4">
-          <div className="px-5 py-3 bg-muted/40 border-b border-border">
-            <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+          <div className="px-3 py-1 bg-[var(--table-head)] border-b border-border">
+            <h3 className="text-sm font-bold text-foreground">
               Customer Information
             </h3>
           </div>
-          <div className="p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          <div className="p-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <div>
               <label className={labelClass} htmlFor="customerId">
                 Customer <span className="text-negative">*</span>
@@ -268,12 +280,12 @@ export default function SalesEntryForm({ customers, priceBook, today, preset }: 
 
         {/* Section: Follow-up & Remarks */}
         <div className="bg-card border border-border rounded-xl overflow-hidden mb-5">
-          <div className="px-5 py-3 bg-muted/40 border-b border-border">
-            <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+          <div className="px-3 py-1 bg-[var(--table-head)] border-b border-border">
+            <h3 className="text-sm font-bold text-foreground">
               Follow-up & Notes
             </h3>
           </div>
-          <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-5">
+          <div className="p-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className={labelClass} htmlFor="nextFollowUpDate">
                 Next Follow-up Date
@@ -297,36 +309,25 @@ export default function SalesEntryForm({ customers, priceBook, today, preset }: 
         </div>
 
         <p className="text-[11px] text-muted-foreground mb-4">
-          <span className="text-negative">*</span> Required fields
+          <span className="text-negative">*</span> Required fields. Keys: Tab moves between fields, Enter in Quantity
+          adds the next product line, Ctrl+Enter saves the visit.
         </p>
 
         <div className="flex items-center gap-3">
           <button
             type="submit"
             disabled={isSubmitting || submitSuccess}
-            className={`inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg text-sm font-semibold transition-all duration-150 active:scale-95 w-44 ${
+            className={`px-6 py-1.5 text-sm font-bold w-44 ${
               submitSuccess
                 ? 'bg-positive text-white cursor-default'
-                : 'bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed'
+                : 'bg-brand text-white disabled:opacity-60 disabled:cursor-not-allowed'
             }`}
           >
-            {isSubmitting ? (
-              <>
-                <Loader2 size={15} className="animate-spin" />
-                Saving...
-              </>
-            ) : submitSuccess ? (
-              <>
-                <CheckCircle size={15} />
-                Saved
-              </>
-            ) : (
-              'Log Visit'
-            )}
+            {isSubmitting ? 'Saving...' : submitSuccess ? 'Saved' : 'Log Visit'}
           </button>
           <button
             type="button"
-            className="px-4 py-2.5 rounded-lg text-sm font-medium text-muted-foreground border border-border hover:bg-muted transition-colors"
+            className="px-4 py-1.5 rounded-lg text-sm font-medium text-muted-foreground border border-border hover:bg-muted transition-colors"
             onClick={() => {
               reset(emptyForm);
               setLines([emptyLine()]);

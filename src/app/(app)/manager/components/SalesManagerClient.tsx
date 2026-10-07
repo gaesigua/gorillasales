@@ -2,7 +2,6 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { UserPlus, Users, Edit2, Trash2, Eye, EyeOff, Shield, CheckCircle, XCircle, Search, MoreVertical, KeyRound, Phone, Mail, MapPin,  } from 'lucide-react';
 import Badge from '@/components/ui/Badge';
 import Modal from '@/components/ui/Modal';
 import { formatRWF } from '@/lib/format';
@@ -221,7 +220,7 @@ export default function SalesManagerClient({ users }: { users: ManagedUser[] }) 
       <div className="space-y-4">
         {formError && (
           <div className="flex items-center gap-2 bg-negative/10 border border-negative/30 text-negative text-sm px-3 py-2 rounded-lg">
-            <XCircle size={15} />
+            
             {formError}
           </div>
         )}
@@ -229,7 +228,7 @@ export default function SalesManagerClient({ users }: { users: ManagedUser[] }) 
           <div>
             <label className="block text-sm font-semibold text-muted-foreground mb-2">Full Name *</label>
             <input
-              className="w-full border border-border rounded-lg px-4 py-3 text-base bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent/40 transition-colors"
+              className="w-full border border-border rounded-lg px-2 py-1.5 text-base bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent/40 transition-colors"
               placeholder="e.g. Jean Habimana"
               value={form.name}
               onChange={(e) => handleFormChange('name', e.target.value)}
@@ -239,7 +238,7 @@ export default function SalesManagerClient({ users }: { users: ManagedUser[] }) 
             <label className="block text-sm font-semibold text-muted-foreground mb-2">Email Address *</label>
             <input
               type="email"
-              className="w-full border border-border rounded-lg px-4 py-3 text-base bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent/40 transition-colors"
+              className="w-full border border-border rounded-lg px-2 py-1.5 text-base bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent/40 transition-colors"
               placeholder="name@gorillasales.rw"
               value={form.email}
               disabled={isEdit}
@@ -249,7 +248,7 @@ export default function SalesManagerClient({ users }: { users: ManagedUser[] }) 
           <div>
             <label className="block text-sm font-semibold text-muted-foreground mb-2">Phone *</label>
             <input
-              className="w-full border border-border rounded-lg px-4 py-3 text-base bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent/40 transition-colors"
+              className="w-full border border-border rounded-lg px-2 py-1.5 text-base bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent/40 transition-colors"
               placeholder="+250 788 000 000"
               value={form.phone}
               onChange={(e) => handleFormChange('phone', e.target.value)}
@@ -258,7 +257,7 @@ export default function SalesManagerClient({ users }: { users: ManagedUser[] }) 
           <div>
             <label className="block text-sm font-semibold text-muted-foreground mb-2">Territory / Area *</label>
             <input
-              className="w-full border border-border rounded-lg px-4 py-3 text-base bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent/40 transition-colors"
+              className="w-full border border-border rounded-lg px-2 py-1.5 text-base bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent/40 transition-colors"
               placeholder="e.g. Remera / Gisozi"
               value={form.area}
               onChange={(e) => handleFormChange('area', e.target.value)}
@@ -267,7 +266,7 @@ export default function SalesManagerClient({ users }: { users: ManagedUser[] }) 
           <div>
             <label className="block text-sm font-semibold text-muted-foreground mb-2">Role *</label>
             <select
-              className="w-full border border-border rounded-lg px-4 py-3 text-base bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent/40 transition-colors cursor-pointer"
+              className="w-full border border-border rounded-lg px-2 py-1.5 text-base bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent/40 transition-colors cursor-pointer"
               value={form.role}
               onChange={(e) => handleFormChange('role', e.target.value)}
             >
@@ -277,7 +276,7 @@ export default function SalesManagerClient({ users }: { users: ManagedUser[] }) 
           <div>
             <label className="block text-sm font-semibold text-muted-foreground mb-2">Status</label>
             <select
-              className="w-full border border-border rounded-lg px-4 py-3 text-base bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent/40 transition-colors cursor-pointer"
+              className="w-full border border-border rounded-lg px-2 py-1.5 text-base bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent/40 transition-colors cursor-pointer"
               value={form.status}
               onChange={(e) => handleFormChange('status', e.target.value)}
             >
@@ -289,7 +288,7 @@ export default function SalesManagerClient({ users }: { users: ManagedUser[] }) 
         {!isEdit && (
           <div className="border-t border-border pt-4">
             <p className="text-xs font-semibold text-muted-foreground mb-3 flex items-center gap-1.5">
-              <KeyRound size={13} /> Account Credentials
+               Account Credentials
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
@@ -297,7 +296,7 @@ export default function SalesManagerClient({ users }: { users: ManagedUser[] }) 
                 <div className="relative">
                   <input
                     type={showPassword ? 'text' : 'password'}
-                    className="w-full border border-border rounded-lg px-4 py-3 pr-10 text-base bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent/40 transition-colors"
+                    className="w-full border border-border rounded-lg px-2 py-1.5 pr-10 text-base bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent/40 transition-colors"
                     placeholder="Min. 10 characters"
                     value={form.password}
                     onChange={(e) => handleFormChange('password', e.target.value)}
@@ -307,7 +306,7 @@ export default function SalesManagerClient({ users }: { users: ManagedUser[] }) 
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                     onClick={() => setShowPassword((v) => !v)}
                   >
-                    {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                    {showPassword ? null : null}
                   </button>
                 </div>
               </div>
@@ -315,7 +314,7 @@ export default function SalesManagerClient({ users }: { users: ManagedUser[] }) 
                 <label className="block text-sm font-semibold text-muted-foreground mb-2">Confirm Password *</label>
                 <input
                   type={showPassword ? 'text' : 'password'}
-                  className="w-full border border-border rounded-lg px-4 py-3 text-base bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent/40 transition-colors"
+                  className="w-full border border-border rounded-lg px-2 py-1.5 text-base bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent/40 transition-colors"
                   placeholder="Repeat password"
                   value={form.confirmPassword}
                   onChange={(e) => handleFormChange('confirmPassword', e.target.value)}
@@ -340,9 +339,9 @@ export default function SalesManagerClient({ users }: { users: ManagedUser[] }) 
         </div>
         <button
           onClick={openAdd}
-          className="flex items-center gap-2 bg-accent text-white px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-accent/90 transition-colors shadow-sm"
+          className="flex items-center gap-2 bg-accent text-white px-4 py-1.5 rounded-lg text-sm font-semibold hover:bg-accent/90 transition-colors shadow-sm"
         >
-          <UserPlus size={16} />
+          
           Add Sales Rep
         </button>
       </div>
@@ -350,7 +349,7 @@ export default function SalesManagerClient({ users }: { users: ManagedUser[] }) 
       {/* Success banner */}
       {successMsg && (
         <div className="flex items-center gap-2 bg-positive/10 border border-positive/30 text-positive text-sm px-4 py-3 rounded-lg">
-          <CheckCircle size={16} />
+          
           {successMsg}
         </div>
       )}
@@ -358,10 +357,10 @@ export default function SalesManagerClient({ users }: { users: ManagedUser[] }) 
       {/* Stats row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
-          { label: 'Total Reps', value: reps.length, icon: <Users size={18} /> },
-          { label: 'Active', value: reps.filter((r) => r.status === 'Active').length, icon: <CheckCircle size={18} className="text-positive" /> },
-          { label: 'Sales Officers', value: reps.filter((r) => r.role === 'Sales Officer').length, icon: <Shield size={18} className="text-accent" /> },
-          { label: 'Inactive', value: reps.filter((r) => r.status !== 'Active').length, icon: <XCircle size={18} className="text-negative" /> },
+          { label: 'Total Reps', value: reps.length, icon: null },
+          { label: 'Active', value: reps.filter((r) => r.status === 'Active').length, icon: null },
+          { label: 'Sales Officers', value: reps.filter((r) => r.role === 'Sales Officer').length, icon: null },
+          { label: 'Inactive', value: reps.filter((r) => r.status !== 'Active').length, icon: null },
         ].map((s) => (
           <div key={s.label} className="bg-card border border-border rounded-xl p-4 flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center text-muted-foreground shrink-0">
@@ -378,16 +377,16 @@ export default function SalesManagerClient({ users }: { users: ManagedUser[] }) 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          
           <input
-            className="w-full pl-9 pr-3 py-3 border border-border rounded-lg text-base bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent/40 transition-colors"
+            className="w-full px-2 py-3 border border-border rounded-lg text-base bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent/40 transition-colors"
             placeholder="Search by name, email, area or ID…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
         <select
-          className="border border-border rounded-lg px-4 py-3 text-base bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent/40 transition-colors cursor-pointer"
+          className="border border-border rounded-lg px-2 py-1.5 text-base bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent/40 transition-colors cursor-pointer"
           value={filterRole}
           onChange={(e) => setFilterRole(e.target.value)}
         >
@@ -395,7 +394,7 @@ export default function SalesManagerClient({ users }: { users: ManagedUser[] }) 
           <option value="Sales Officer">Sales Officer</option>
         </select>
         <select
-          className="border border-border rounded-lg px-4 py-3 text-base bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent/40 transition-colors cursor-pointer"
+          className="border border-border rounded-lg px-2 py-1.5 text-base bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent/40 transition-colors cursor-pointer"
           value={filterStatus}
           onChange={(e) => setFilterStatus(e.target.value)}
         >
@@ -432,9 +431,6 @@ export default function SalesManagerClient({ users }: { users: ManagedUser[] }) 
                 <tr key={rep.id} className="hover:bg-muted/30 transition-colors">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-accent/20 flex items-center justify-center text-xs font-bold text-accent shrink-0">
-                        {rep.name.split(' ').map((n) => n[0]).join('').slice(0, 2)}
-                      </div>
                       <div>
                         <p className="font-semibold text-foreground">{rep.name}</p>
                         <p className="text-xs text-muted-foreground">{rep.email}</p>
@@ -463,21 +459,21 @@ export default function SalesManagerClient({ users }: { users: ManagedUser[] }) 
                         className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
                         title="View details"
                       >
-                        <Eye size={15} />
+                        Show
                       </button>
                       <button
                         onClick={() => openEdit(rep)}
                         className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
                         title="Edit"
                       >
-                        <Edit2 size={15} />
+                        Edit
                       </button>
                       <div className="relative">
                         <button
                           onClick={() => setOpenMenuId(openMenuId === rep.id ? null : rep.id)}
                           className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
                         >
-                          <MoreVertical size={15} />
+                          More
                         </button>
                         {openMenuId === rep.id && (
                           <div className="absolute right-0 top-8 z-20 bg-card border border-border rounded-xl shadow-lg py-1 w-44">
@@ -485,14 +481,14 @@ export default function SalesManagerClient({ users }: { users: ManagedUser[] }) 
                               onClick={() => toggleStatus(rep)}
                               className="w-full text-left px-4 py-2 text-sm hover:bg-muted text-foreground flex items-center gap-2"
                             >
-                              {rep.status === 'Active' ? <XCircle size={14} className="text-negative" /> : <CheckCircle size={14} className="text-positive" />}
+                              {rep.status === 'Active' ? null : null}
                               {rep.status === 'Active' ? 'Deactivate' : 'Activate'}
                             </button>
                             <button
                               onClick={() => { setDeleteConfirm(rep); setOpenMenuId(null); }}
                               className="w-full text-left px-4 py-2 text-sm hover:bg-negative/10 text-negative flex items-center gap-2"
                             >
-                              <Trash2 size={14} />
+                              
                               Deactivate Rep
                             </button>
                           </div>
@@ -526,7 +522,7 @@ export default function SalesManagerClient({ users }: { users: ManagedUser[] }) 
               disabled={saving}
               className="px-4 py-2 rounded-lg text-sm bg-accent text-white font-semibold hover:bg-accent/90 transition-colors flex items-center gap-2"
             >
-              <UserPlus size={15} />
+              
               Create Account
             </button>
           </div>
@@ -549,7 +545,7 @@ export default function SalesManagerClient({ users }: { users: ManagedUser[] }) 
               disabled={saving}
               className="px-4 py-2 rounded-lg text-sm bg-accent text-white font-semibold hover:bg-accent/90 transition-colors flex items-center gap-2"
             >
-              <CheckCircle size={15} />
+              
               Save Changes
             </button>
           </div>
@@ -561,9 +557,6 @@ export default function SalesManagerClient({ users }: { users: ManagedUser[] }) 
         {viewRep && (
           <div className="space-y-5">
             <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-full bg-accent/20 flex items-center justify-center text-lg font-bold text-accent">
-                {viewRep.name.split(' ').map((n) => n[0]).join('').slice(0, 2)}
-              </div>
               <div>
                 <h3 className="text-lg font-bold text-foreground">{viewRep.name}</h3>
                 <div className="flex items-center gap-2 mt-1">
@@ -574,28 +567,27 @@ export default function SalesManagerClient({ users }: { users: ManagedUser[] }) 
             </div>
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div className="flex items-start gap-2">
-                <Mail size={14} className="text-muted-foreground mt-0.5 shrink-0" />
+                
                 <div>
                   <p className="text-xs text-muted-foreground">Email</p>
                   <p className="text-foreground font-medium">{viewRep.email}</p>
                 </div>
               </div>
               <div className="flex items-start gap-2">
-                <Phone size={14} className="text-muted-foreground mt-0.5 shrink-0" />
                 <div>
                   <p className="text-xs text-muted-foreground">Phone</p>
                   <p className="text-foreground font-medium">{viewRep.phone}</p>
                 </div>
               </div>
               <div className="flex items-start gap-2">
-                <MapPin size={14} className="text-muted-foreground mt-0.5 shrink-0" />
+                
                 <div>
                   <p className="text-xs text-muted-foreground">Territory</p>
                   <p className="text-foreground font-medium">{viewRep.area}</p>
                 </div>
               </div>
               <div className="flex items-start gap-2">
-                <Shield size={14} className="text-muted-foreground mt-0.5 shrink-0" />
+                
                 <div>
                   <p className="text-xs text-muted-foreground">Role</p>
                   <p className="text-foreground font-medium">{viewRep.role}</p>
@@ -621,7 +613,7 @@ export default function SalesManagerClient({ users }: { users: ManagedUser[] }) 
                 onClick={() => { setViewRep(null); openEdit(viewRep); }}
                 className="px-4 py-2 rounded-lg text-sm bg-accent text-white font-semibold hover:bg-accent/90 transition-colors flex items-center gap-2"
               >
-                <Edit2 size={14} />
+                
                 Edit Info
               </button>
             </div>
@@ -646,7 +638,7 @@ export default function SalesManagerClient({ users }: { users: ManagedUser[] }) 
               onClick={handleDelete}
               className="px-4 py-2 rounded-lg text-sm bg-negative text-white font-semibold hover:bg-negative/90 transition-colors flex items-center gap-2"
             >
-              <Trash2 size={14} />
+              
               Deactivate
             </button>
           </div>

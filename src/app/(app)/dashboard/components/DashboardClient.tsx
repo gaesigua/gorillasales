@@ -49,25 +49,11 @@ export default function DashboardClient({ data }: { data: DashboardData }) {
         {/* KPI Bento Grid */}
         <DashboardKpiGrid data={data} />
 
-        {/* Orders & receivables */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {[
-            { label: 'Outstanding receivables', value: formatRWF(data.receivables.total), href: '/receivables', alert: false },
-            { label: 'Overdue', value: formatRWF(data.receivables.overdue), href: '/receivables', alert: data.receivables.overdue > 0 },
-            { label: 'Orders on credit hold', value: String(data.ordersOnHold), href: '/orders', alert: data.ordersOnHold > 0 },
-            { label: 'Orders to deliver', value: String(data.ordersToDeliver), href: '/orders', alert: false },
-          ].map((k) => (
-            <Link key={k.label} href={k.href} className="bg-card border border-border rounded-xl p-4 hover:bg-muted/40">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{k.label}</p>
-              <p className={`text-xl font-bold font-tabular mt-1 ${k.alert ? 'text-negative' : 'text-foreground'}`}>{k.value}</p>
-            </Link>
-          ))}
-        </div>
 
         {/* Charts + Overdue Feed row */}
         <div className="grid grid-cols-1 xl:grid-cols-3 2xl:grid-cols-3 gap-4">
           {/* Sales Trend Chart */}
-          <div className="xl:col-span-2 bg-card border border-border rounded-xl p-5">
+          <div className="xl:col-span-2 bg-card border border-border p-3">
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="text-sm font-semibold text-foreground">
@@ -93,7 +79,7 @@ export default function DashboardClient({ data }: { data: DashboardData }) {
         {/* Rep performance row — only for managers/admins */}
         {canViewAllReps && (
           <div className="grid grid-cols-1 xl:grid-cols-3 2xl:grid-cols-3 gap-4">
-            <div className="xl:col-span-1 bg-card border border-border rounded-xl p-5">
+            <div className="xl:col-span-1 bg-card border border-border p-3">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm font-semibold text-foreground">
                   Achievement by Rep
@@ -101,20 +87,6 @@ export default function DashboardClient({ data }: { data: DashboardData }) {
                 <span className="text-[11px] text-muted-foreground">{MONTH_SHORT[data.month]} {data.year}</span>
               </div>
               <RepPerformanceChart rows={data.repRows} />
-              <div className="flex items-center gap-4 mt-3 pt-3 border-t border-border">
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-sm bg-positive" />
-                  <span className="text-[11px] text-muted-foreground">≥80% on target</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-sm bg-accent" />
-                  <span className="text-[11px] text-muted-foreground">60–79% at risk</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-sm bg-negative" />
-                  <span className="text-[11px] text-muted-foreground">&lt;60% critical</span>
-                </div>
-              </div>
             </div>
 
             <div className="xl:col-span-2">
@@ -138,7 +110,7 @@ export default function DashboardClient({ data }: { data: DashboardData }) {
               : myTarget?.achievementPct >= 60
               ? 'bg-accent' :'bg-negative';
           return (
-            <div className="bg-card border border-border rounded-xl p-5">
+            <div className="bg-card border border-border p-3">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm font-semibold text-foreground">My Performance — {period}</h3>
               </div>

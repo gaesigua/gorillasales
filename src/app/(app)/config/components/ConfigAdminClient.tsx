@@ -12,7 +12,6 @@ import ProductsEditor from './ProductsEditor';
 import PriceListsEditor from './PriceListsEditor';
 import TaxSettingsEditor from './TaxSettingsEditor';
 import WarehousesEditor from './WarehousesEditor';
-import { Warehouse, Tags, Receipt, Tag, CheckSquare, Package, TrendingUp, CheckCircle, Info, Target, DollarSign, List, Sparkles, AlertCircle, Users } from 'lucide-react';
 import {
   saveCommissionRules,
   saveLookupList,
@@ -28,50 +27,50 @@ const TABS: { id: TabId; label: string; icon: React.ReactNode; description: stri
   {
     id: 'lookup',
     label: 'Lookup Tables',
-    icon: <List size={15} />,
+    icon: null,
     description: 'Manage dropdown lists: customer categories, visit outcomes and pipeline stages. Renaming an entry also updates existing records.',
   },
   {
     id: 'products',
     label: 'Products',
-    icon: <Package size={15} />,
+    icon: null,
     description:
       'Manage the product catalogue: list prices, the coffee weight of each unit, green (roast input) vs finished, and shelf life used for best-before dates.',
   },
   {
     id: 'warehouses',
     label: 'Warehouses',
-    icon: <Warehouse size={15} />,
+    icon: null,
     description: 'Stock locations. The default warehouse is used for direct deliveries.',
   },
   {
     id: 'price-lists',
     label: 'Price Lists',
-    icon: <Tags size={15} />,
+    icon: null,
     description: 'Special prices per customer group. Sales officers cannot change prices on orders; they come from these lists.',
   },
   {
     id: 'tax',
     label: 'Tax & Invoicing',
-    icon: <Receipt size={15} />,
+    icon: null,
     description: 'Company TIN and VAT settings used on orders and invoices.',
   },
   {
     id: 'targets',
     label: 'Monthly Targets',
-    icon: <Target size={15} />,
+    icon: null,
     description: 'Set individual monthly sales targets (RWF and KG) per rep per period.',
   },
   {
     id: 'commission',
     label: 'Commission & Bonuses',
-    icon: <DollarSign size={15} />,
+    icon: null,
     description: 'Define commission percentages and flat bonuses triggered at achievement thresholds.',
   },
   {
     id: 'custom-fields',
     label: 'Custom Fields',
-    icon: <Sparkles size={15} />,
+    icon: null,
     description: 'Extend customer, visit, deal, and product records with custom attributes.',
   },
 ];
@@ -151,7 +150,7 @@ export default function ConfigAdminClient({ targets: initialTargets, commissionR
           {saving && <span className="text-xs text-muted-foreground">Saving...</span>}
           {status?.type === 'saved' && (
             <span className="flex items-center gap-1.5 text-positive text-xs font-semibold px-3 py-1.5 bg-positive-bg rounded-lg border border-positive/20">
-              <CheckCircle size={13} />
+              
               Saved
             </span>
           )}
@@ -160,7 +159,7 @@ export default function ConfigAdminClient({ targets: initialTargets, commissionR
 
       {status?.type === 'error' && (
         <div className="mb-5 px-4 py-3 rounded-xl bg-negative-bg border border-negative/20 flex items-start gap-2.5 text-sm text-negative">
-          <AlertCircle size={15} className="shrink-0 mt-0.5" />
+          
           {status.message}
         </div>
       )}
@@ -171,7 +170,7 @@ export default function ConfigAdminClient({ targets: initialTargets, commissionR
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px whitespace-nowrap ${
+            className={`flex items-center gap-2 px-4 py-1.5 text-sm font-medium border-b-2 transition-colors -mb-px whitespace-nowrap ${
               activeTab === tab.id
                 ? 'border-accent text-accent'
                 : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
@@ -185,7 +184,7 @@ export default function ConfigAdminClient({ targets: initialTargets, commissionR
 
       {/* Info banner */}
       <div className="mb-5 px-4 py-3 rounded-xl bg-accent/5 border border-accent/20 flex items-start gap-2.5">
-        <Info size={15} className="text-accent shrink-0 mt-0.5" />
+        
         <p className="text-sm text-foreground/80">{activeTabInfo.description}</p>
       </div>
 
@@ -193,7 +192,6 @@ export default function ConfigAdminClient({ targets: initialTargets, commissionR
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
           <div className="flex flex-col">
             <div className="flex items-center gap-2 mb-2 px-1">
-              <span className="text-accent"><Tag size={16} /></span>
               <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Customer Categories</span>
             </div>
             <LookupTableEditor
@@ -210,7 +208,6 @@ export default function ConfigAdminClient({ targets: initialTargets, commissionR
           </div>
           <div className="flex flex-col">
             <div className="flex items-center gap-2 mb-2 px-1">
-              <span className="text-accent"><CheckSquare size={16} /></span>
               <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Visit Outcomes</span>
             </div>
             <LookupTableEditor
@@ -227,7 +224,6 @@ export default function ConfigAdminClient({ targets: initialTargets, commissionR
           </div>
           <div className="flex flex-col">
             <div className="flex items-center gap-2 mb-2 px-1">
-              <span className="text-accent"><TrendingUp size={16} /></span>
               <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Pipeline Stages</span>
             </div>
             <LookupTableEditor
@@ -254,10 +250,9 @@ export default function ConfigAdminClient({ targets: initialTargets, commissionR
           </div>
           <div className="flex flex-col">
             <div className="flex items-center gap-2 mb-2 px-1">
-              <span className="text-accent"><Users size={16} /></span>
               <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Salespeople</span>
             </div>
-            <div className="bg-card border border-border rounded-xl p-5 text-sm text-muted-foreground">
+            <div className="bg-card border border-border p-3 text-sm text-muted-foreground">
               Salespeople are the active <strong className="text-foreground">Sales Officer</strong> user accounts. Add,
               deactivate or change roles in{' '}
               <Link href="/user-management" className="text-accent underline">

@@ -1,7 +1,6 @@
 'use client';
 
-import React from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
 import { computeOrderTotals } from '@/lib/domain/money';
 import { formatRWFFull } from '@/lib/format';
 import { newTempId } from '@/lib/clientId';
@@ -60,32 +59,48 @@ export default function OrderLinesEditor({
   );
   const kg = filled.reduce((s, l) => s + Number(l.quantity) * (products.find((p) => p.id === l.productId)?.weightKg ?? 0), 0);
 
+  // Keyboard flow: Enter in Quantity/Price moves to the next line's product, adding a line at the end
+  const tableRef = useRef<HTMLTableElement>(null);
+  const [focusRow, setFocusRow] = useState<number | null>(null);
+  useEffect(() => {
+    if (focusRow === null) return;
+    tableRef.current?.querySelectorAll<HTMLSelectElement>('select[aria-label="Product"]')[focusRow]?.focus();
+    setFocusRow(null);
+  }, [focusRow, lines.length]);
+  const onLineKeyDown = (e: React.KeyboardEvent, index: number) => {
+    if (e.key !== 'Enter' || e.ctrlKey || e.metaKey) return;
+    e.preventDefault();
+    const isLast = index === lines.length - 1;
+    if (isLast && lines[index].productId && lines.length < products.length) onChange([...lines, emptyLine()]);
+    if (!isLast || lines[index].productId) setFocusRow(index + 1);
+  };
+
   const update = (key: string, patch: Partial<DraftLine>) =>
     onChange(lines.map((l) => (l.key === key ? { ...l, ...patch } : l)));
   const usedProducts = new Set(lines.map((l) => l.productId));
 
-  const cell = 'border border-border rounded-md px-2 py-2 text-sm bg-background text-foreground w-full focus:outline-none focus:ring-2 focus:ring-ring';
+  const cell = 'border border-border px-1.5 py-1 text-sm bg-background text-foreground w-full';
 
   return (
     <div className="space-y-3">
       <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+        <table ref={tableRef} className="w-full text-sm">
           <thead>
-            <tr className="text-[11px] uppercase tracking-wider text-muted-foreground">
-              <th className="text-left font-semibold pb-2 pr-2">Product</th>
-              <th className="text-right font-semibold pb-2 px-2 w-28">Quantity</th>
-              <th className="text-right font-semibold pb-2 px-2 w-36">Unit Price (RWF)</th>
-              <th className="text-right font-semibold pb-2 px-2 w-36">Line Total</th>
-              <th className="pb-2 w-10" />
+            <tr>
+              <th className="text-left px-2 py-1">Product</th>
+              <th className="text-right px-2 py-1 w-28">Quantity</th>
+              <th className="text-right px-2 py-1 w-36">Unit price (RWF)</th>
+              <th className="text-right px-2 py-1 w-36">Line total</th>
+              <th className="px-2 py-1 w-16" />
             </tr>
           </thead>
           <tbody>
-            {lines.map((l) => {
+            {lines.map((l, index) => {
               const product = products.find((p) => p.id === l.productId);
               const price = effectivePrice(l);
               return (
                 <tr key={l.key}>
-                  <td className="py-1 pr-2">
+                  <td className="p-1">
                     <select
                       className={cell}
                       value={l.productId}
@@ -100,7 +115,7 @@ export default function OrderLinesEditor({
                       ))}
                     </select>
                   </td>
-                  <td className="py-1 px-2">
+                  <td className="p-1">
                     <input
                       className={`${cell} text-right`}
                       type="number"
@@ -110,10 +125,11 @@ export default function OrderLinesEditor({
                       placeholder={product?.unitOfMeasure ?? 'Qty'}
                       value={l.quantity}
                       onChange={(e) => update(l.key, { quantity: e.target.value })}
+                      onKeyDown={(e) => onLineKeyDown(e, index)}
                       aria-label="Quantity"
                     />
                   </td>
-                  <td className="py-1 px-2">
+                  <td className="p-1">
                     {canEditPrice ? (
                       <input
                         className={`${cell} text-right`}
@@ -122,6 +138,7 @@ export default function OrderLinesEditor({
                         placeholder={l.productId ? String(priceFor(l.productId)) : ''}
                         value={l.unitPrice}
                         onChange={(e) => update(l.key, { unitPrice: e.target.value })}
+                        onKeyDown={(e) => onLineKeyDown(e, index)}
                         aria-label="Unit price"
                       />
                     ) : (
@@ -130,17 +147,17 @@ export default function OrderLinesEditor({
                       </div>
                     )}
                   </td>
-                  <td className="py-1 px-2 text-right font-tabular font-semibold">
+                  <td className="px-2 py-1 text-right font-tabular font-semibold">
                     {l.productId && Number(l.quantity) > 0 ? (Number(l.quantity) * price).toLocaleString('en-US') : '—'}
                   </td>
-                  <td className="py-1 text-right">
+                  <td className="p-1 text-center">
                     <button
                       type="button"
                       onClick={() => onChange(lines.length > 1 ? lines.filter((x) => x.key !== l.key) : [emptyLine()])}
-                      className="p-1.5 rounded-md text-muted-foreground hover:text-negative hover:bg-negative/10"
+                      className="text-xs text-link underline"
                       title="Remove line"
                     >
-                      <Trash2 size={14} />
+                      Delete
                     </button>
                   </td>
                 </tr>
@@ -155,9 +172,9 @@ export default function OrderLinesEditor({
           type="button"
           onClick={() => onChange([...lines, emptyLine()])}
           disabled={lines.length >= products.length}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-sm font-medium hover:bg-muted disabled:opacity-40"
+          className="px-3 py-1 border border-border text-sm disabled:opacity-40"
         >
-          <Plus size={14} /> Add product
+          Add product
         </button>
         <dl className="text-sm min-w-[240px] space-y-1">
           <div className="flex justify-between gap-6">
@@ -178,6 +195,7 @@ export default function OrderLinesEditor({
           </div>
         </dl>
       </div>
+      <p className="text-xs text-muted-foreground no-print">Press Enter in Quantity to go to the next line.</p>
       {!canEditPrice && (
         <p className="text-xs text-muted-foreground">Prices come from the customer&apos;s price list. Ask a manager for special pricing.</p>
       )}

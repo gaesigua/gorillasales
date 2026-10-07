@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { X, Phone, MapPin, User, Calendar } from 'lucide-react';
 import { formatRWFFull, formatRWF } from '@/lib/format';
 import Link from 'next/link';
 import { getCustomerVisits } from '@/actions/visits';
@@ -87,7 +86,7 @@ export default function CustomerDetailPanel({ customer, onClose, onEdit }: Custo
             onClick={onClose}
             className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors shrink-0"
           >
-            <X size={16} />
+            Close
           </button>
         </div>
 
@@ -99,19 +98,18 @@ export default function CustomerDetailPanel({ customer, onClose, onEdit }: Custo
               Contact
             </h4>
             <div className="flex items-center gap-2 text-sm">
-              <User size={14} className="text-muted-foreground shrink-0" />
+              
               <span className="text-foreground">{customer.contactPerson || '—'}</span>
             </div>
             <div className="flex items-center gap-2 text-sm">
-              <Phone size={14} className="text-muted-foreground shrink-0" />
               <span className="text-foreground font-tabular">{customer.phone || '—'}</span>
             </div>
             <div className="flex items-center gap-2 text-sm">
-              <MapPin size={14} className="text-muted-foreground shrink-0" />
+              
               <span className="text-foreground">{customer.area}</span>
             </div>
             <div className="flex items-center gap-2 text-sm">
-              <User size={14} className="text-muted-foreground shrink-0" />
+              
               <span className="text-muted-foreground">Owner:</span>
               <span className="text-foreground">{customer.salesperson || 'Unassigned'}</span>
             </div>
@@ -207,7 +205,7 @@ export default function CustomerDetailPanel({ customer, onClose, onEdit }: Custo
           {/* Next follow-up */}
           {customer.nextFollowUp && (
             <div className="flex items-center gap-3 bg-accent/5 border border-accent/20 rounded-xl p-4">
-              <Calendar size={16} className="text-accent shrink-0" />
+              
               <div>
                 <p className="text-xs font-semibold text-accent">Next Follow-up</p>
                 <p className="text-sm text-foreground font-tabular mt-0.5">

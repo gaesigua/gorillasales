@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useCallback } from 'react';
-import { Plus, Pencil, Trash2, Check, X, AlertCircle, GripVertical, ChevronDown } from 'lucide-react';
 import { newTempId } from '@/lib/clientId';
 import type { CommissionRule } from '@/lib/types';
 
@@ -127,7 +126,7 @@ export default function CommissionRulesEditor({ rules, onChange }: CommissionRul
                 <option value="percentage">Percentage (%)</option>
                 <option value="flat">Flat Amount (RWF)</option>
               </select>
-              <ChevronDown size={11} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+              
             </div>
           </div>
           <div>
@@ -172,8 +171,8 @@ export default function CommissionRulesEditor({ rules, onChange }: CommissionRul
             />
           </div>
           <div className="flex items-center gap-1 shrink-0 pb-0.5">
-            <button onClick={onSave} className="p-1.5 rounded-lg bg-positive text-white hover:bg-positive/90 transition-colors" title="Save"><Check size={13} /></button>
-            <button onClick={onCancel} className="p-1.5 rounded-lg bg-muted text-muted-foreground hover:bg-muted/80 transition-colors" title="Cancel"><X size={13} /></button>
+            <button onClick={onSave} className="p-1.5 rounded-lg bg-positive text-white hover:bg-positive/90 transition-colors" title="Save">Save</button>
+            <button onClick={onCancel} className="p-1.5 rounded-lg bg-muted text-muted-foreground hover:bg-muted/80 transition-colors" title="Cancel">Close</button>
           </div>
         </div>
       </td>
@@ -193,7 +192,7 @@ export default function CommissionRulesEditor({ rules, onChange }: CommissionRul
           disabled={addingNew}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent text-white text-xs font-semibold hover:bg-accent/90 transition-colors disabled:opacity-50 shrink-0"
         >
-          <Plus size={13} />
+          
           Add Rule
         </button>
       </div>
@@ -201,7 +200,7 @@ export default function CommissionRulesEditor({ rules, onChange }: CommissionRul
       {/* Error */}
       {error && (
         <div className="mx-4 mt-3 px-3 py-2 rounded-lg bg-negative/10 border border-negative/20 flex items-center gap-2 text-negative text-xs">
-          <AlertCircle size={13} />
+          
           {error}
         </div>
       )}
@@ -211,13 +210,13 @@ export default function CommissionRulesEditor({ rules, onChange }: CommissionRul
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border bg-muted/30">
-              <th className="w-8 px-3 py-2.5"></th>
-              <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Rule</th>
-              <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Type</th>
-              <th className="text-right px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Value</th>
-              <th className="text-right px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Min Achievement</th>
-              <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden md:table-cell">Description</th>
-              <th className="px-4 py-2.5 w-20"></th>
+              <th className="w-8 px-3 py-1.5"></th>
+              <th className="text-left px-4 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Rule</th>
+              <th className="text-left px-4 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Type</th>
+              <th className="text-right px-4 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Value</th>
+              <th className="text-right px-4 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Min Achievement</th>
+              <th className="text-left px-4 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden md:table-cell">Description</th>
+              <th className="px-4 py-1.5 w-20"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -239,40 +238,40 @@ export default function CommissionRulesEditor({ rules, onChange }: CommissionRul
                 <FormRow key={rule.id} form={editForm} setForm={setEditForm} onSave={saveEdit} onCancel={cancelEdit} />
               ) : (
                 <tr key={rule.id} className="hover:bg-muted/30 transition-colors group">
-                  <td className="px-3 py-2.5">
+                  <td className="px-3 py-1.5">
                     <button
                       onClick={() => moveUp(index)}
                       disabled={index === 0}
                       className="p-0.5 rounded text-muted-foreground/40 hover:text-muted-foreground disabled:opacity-20 transition-colors"
                       title="Move up"
                     >
-                      <GripVertical size={14} className="rotate-90" />
+                      
                     </button>
                   </td>
-                  <td className="px-4 py-2.5">
+                  <td className="px-4 py-1.5">
                     <div className="flex items-center gap-2">
                       <span className="w-5 h-5 rounded-full bg-accent text-white text-[10px] font-bold flex items-center justify-center shrink-0">{index + 1}</span>
                       <span className="font-semibold text-foreground text-sm">{rule.name}</span>
                     </div>
                   </td>
-                  <td className="px-4 py-2.5">
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${rule.type === 'percentage' ? 'bg-blue-50 text-blue-700' : 'bg-purple-50 text-purple-700'}`}>
+                  <td className="px-4 py-1.5">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${rule.type === 'percentage' ? 'bg-info-bg text-info' : 'bg-muted text-foreground'}`}>
                       {rule.type === 'percentage' ? 'Percentage' : 'Flat'}
                     </span>
                   </td>
-                  <td className="px-4 py-2.5 text-right font-tabular font-semibold text-foreground">
+                  <td className="px-4 py-1.5 text-right font-tabular font-semibold text-foreground">
                     {rule.type === 'percentage' ? `${rule.value}%` : `RWF ${rule.value.toLocaleString()}`}
                   </td>
-                  <td className="px-4 py-2.5 text-right">
+                  <td className="px-4 py-1.5 text-right">
                     {rule.thresholdPct === 0
                       ? <span className="text-xs text-muted-foreground">Always</span>
                       : <span className="text-xs font-semibold text-foreground">≥ {rule.thresholdPct}%</span>
                     }
                   </td>
-                  <td className="px-4 py-2.5 text-xs text-muted-foreground hidden md:table-cell max-w-[200px] truncate">{rule.description}</td>
-                  <td className="px-4 py-2.5">
+                  <td className="px-4 py-1.5 text-xs text-muted-foreground hidden md:table-cell max-w-[200px] truncate">{rule.description}</td>
+                  <td className="px-4 py-1.5">
                     <div className="flex items-center gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => startEdit(rule)} className="p-1.5 rounded-lg text-muted-foreground hover:text-accent hover:bg-accent/10 transition-colors" title="Edit"><Pencil size={12} /></button>
+                      <button onClick={() => startEdit(rule)} className="p-1.5 rounded-lg text-muted-foreground hover:text-accent hover:bg-accent/10 transition-colors" title="Edit">Edit</button>
                       {deleteConfirmId === rule.id ? (
                         <div className="flex items-center gap-1">
                           <span className="text-xs text-negative font-medium">Delete?</span>
@@ -280,7 +279,7 @@ export default function CommissionRulesEditor({ rules, onChange }: CommissionRul
                           <button onClick={() => setDeleteConfirmId(null)} className="p-1 rounded bg-muted text-muted-foreground text-xs hover:bg-muted/80 transition-colors">No</button>
                         </div>
                       ) : (
-                        <button onClick={() => setDeleteConfirmId(rule.id)} className="p-1.5 rounded-lg text-muted-foreground hover:text-negative hover:bg-negative/10 transition-colors" title="Delete"><Trash2 size={12} /></button>
+                        <button onClick={() => setDeleteConfirmId(rule.id)} className="p-1.5 rounded-lg text-muted-foreground hover:text-negative hover:bg-negative/10 transition-colors" title="Delete">Delete</button>
                       )}
                     </div>
                   </td>
@@ -292,7 +291,7 @@ export default function CommissionRulesEditor({ rules, onChange }: CommissionRul
       </div>
 
       {/* Footer */}
-      <div className="px-5 py-2.5 border-t border-border bg-muted/20 flex items-center justify-between">
+      <div className="px-5 py-1.5 border-t border-border bg-muted/20 flex items-center justify-between">
         <span className="text-xs text-muted-foreground">{rules.length} rule{rules.length !== 1 ? 's' : ''}</span>
         <span className="text-xs text-muted-foreground">Rules are evaluated in order — higher rows take priority</span>
       </div>

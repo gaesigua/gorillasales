@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useEffect } from 'react';
-import { X } from 'lucide-react';
 
 interface ModalProps {
   open: boolean;
@@ -41,22 +40,22 @@ export default function Modal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div
-        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/40"
         onClick={onClose}
       />
       <div
-        className={`relative w-full ${sizeClasses[size]} bg-card rounded-xl shadow-2xl border border-border fade-in`}
+        className={`relative w-full ${sizeClasses[size]} bg-card border-2 border-foreground`}
       >
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-          <h3 className="text-base font-semibold text-foreground">{title}</h3>
+        <div className="flex items-center justify-between px-3 py-1.5 bg-brand text-white">
+          <h3 className="text-sm font-bold">{title}</h3>
           <button
             onClick={onClose}
-            className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+            className="text-xs text-white underline"
           >
-            <X size={16} />
+            Close
           </button>
         </div>
-        <div className="p-5">{children}</div>
+        <div className="p-4">{children}</div>
       </div>
     </div>
   );

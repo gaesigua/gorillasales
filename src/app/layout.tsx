@@ -1,14 +1,6 @@
 import React from 'react';
 import type { Metadata, Viewport } from 'next';
-import { Roboto } from 'next/font/google';
 import '../styles/tailwind.css';
-
-const roboto = Roboto({
-  subsets: ['latin'],
-  weight: ['100', '300', '400', '500', '700', '900'],
-  variable: '--font-roboto',
-  display: 'swap',
-});
 
 export const viewport: Viewport = {
   width: 'device-width',
@@ -28,7 +20,7 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={roboto.variable}>
+    <html lang="en">
       <body>{children}</body>
     </html>
   );

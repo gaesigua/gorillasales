@@ -1,8 +1,7 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Cell } from 'recharts';
-import { TrendingUp, ChevronDown, Info } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { formatRWF } from '@/lib/format';
 import { MONTH_SHORT } from '@/lib/dates';
 import { useUser } from '@/context/UserContext';
@@ -14,7 +13,12 @@ import type { PipelineDeal, RepPerformanceRow } from '@/lib/types';
 //   Weighted  = sum of deal value × stage probability
 //   Best case = full value of every open deal
 const COMMIT_THRESHOLD = 80;
-const FALLBACK_COLORS = ['#94a3b8', '#60a5fa', '#a78bfa', '#fbbf24', '#f97316', '#22c55e'];
+// Validated ordinal blue ramp: commit (darkest, most certain) -> best case (lightest)
+const COMMIT_FILL = '#1c4f94';
+const WEIGHTED_FILL = '#3f7fc9';
+const BEST_CASE_FILL = '#7fa9dc';
+// Stages are already ordered on the x-axis, so one colour is enough
+const STAGE_FILL = '#2f6fb7';
 
 interface ForecastPoint {
   period: string;
@@ -107,12 +111,11 @@ export default function SalesForecastingPanel({ deals, repRows, today }: SalesFo
 
   const stageBreakdown = config.pipelineStages
     .filter((s) => s.probability > 0 && s.probability < 100)
-    .map((stage, i) => {
+    .map((stage) => {
       const stageDeals = openDeals.filter((d) => d.stageId === stage.id);
       const pipelineValue = stageDeals.reduce((s, d) => s + d.potentialValue, 0);
       return {
         stage: stage.name,
-        color: stage.color || FALLBACK_COLORS[i % FALLBACK_COLORS.length],
         probability: stage.probability,
         pipelineValue,
         expectedRevenue: Math.round((pipelineValue * stage.probability) / 100),
@@ -140,7 +143,7 @@ export default function SalesForecastingPanel({ deals, repRows, today }: SalesFo
       {/* Section header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex items-center gap-2">
-          <TrendingUp size={18} className="text-accent" />
+          
           <div>
             <h2 className="text-lg font-bold text-foreground">Sales Forecast</h2>
             <p className="text-xs text-muted-foreground">
@@ -162,7 +165,7 @@ export default function SalesForecastingPanel({ deals, repRows, today }: SalesFo
                 </option>
               ))}
             </select>
-            <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+            
           </div>
         )}
       </div>
@@ -187,7 +190,7 @@ export default function SalesForecastingPanel({ deals, repRows, today }: SalesFo
       </div>
 
       {/* Forecast chart */}
-      <div className="bg-card border border-border rounded-xl p-5">
+      <div className="bg-card border border-border p-3">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h3 className="text-sm font-semibold text-foreground">Revenue Projection — next 6 months</h3>
@@ -198,26 +201,31 @@ export default function SalesForecastingPanel({ deals, repRows, today }: SalesFo
             )}
           </div>
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/60 px-2 py-1 rounded-lg">
-            <Info size={11} />
+            
             <span>Based on {openDeals.length} open deals</span>
           </div>
         </div>
         <ResponsiveContainer width="100%" height={240}>
           <BarChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" strokeOpacity={0.5} vertical={false} />
+            <CartesianGrid stroke="#e4e4e4" vertical={false} />
             <XAxis dataKey="period" tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} />
             <YAxis
               tick={{ fontSize: 10, fill: 'var(--muted-foreground)' }}
               axisLine={false}
               tickLine={false}
               tickFormatter={(v) => formatRWF(v)}
-              width={72}
+              width={84}
             />
-            <Tooltip content={<CustomTooltip />} />
-            <Legend iconType="square" iconSize={8} wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
-            <Bar dataKey="commit" name="Commit" fill="#57534e" />
-            <Bar dataKey="weighted" name="Weighted" fill="var(--accent)" />
-            <Bar dataKey="bestCase" name="Best case" fill="#d6d3d1" />
+            <Tooltip content={<CustomTooltip />} cursor={{ fill: 'var(--muted)' }} isAnimationActive={false} />
+            <Legend
+              iconType="square"
+              iconSize={10}
+              wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }}
+              formatter={(value) => <span className="text-foreground">{value}</span>}
+            />
+            <Bar dataKey="commit" name="Commit" fill={COMMIT_FILL} isAnimationActive={false} />
+            <Bar dataKey="weighted" name="Weighted" fill={WEIGHTED_FILL} isAnimationActive={false} />
+            <Bar dataKey="bestCase" name="Best case" fill={BEST_CASE_FILL} isAnimationActive={false} />
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -225,33 +233,28 @@ export default function SalesForecastingPanel({ deals, repRows, today }: SalesFo
       {/* Bottom two-column grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {/* Stage breakdown */}
-        <div className="bg-card border border-border rounded-xl p-5">
+        <div className="bg-card border border-border p-3">
           <h3 className="text-sm font-semibold text-foreground mb-1">Expected Revenue by Stage</h3>
           <p className="text-xs text-muted-foreground mb-4">Pipeline value × stage probability</p>
           <ResponsiveContainer width="100%" height={180}>
             <BarChart data={stageBreakdown} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" strokeOpacity={0.5} vertical={false} />
+              <CartesianGrid stroke="#e4e4e4" vertical={false} />
               <XAxis dataKey="stage" tick={{ fontSize: 10, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} />
               <YAxis
                 tick={{ fontSize: 10, fill: 'var(--muted-foreground)' }}
                 axisLine={false}
                 tickLine={false}
                 tickFormatter={(v) => formatRWF(v)}
-                width={68}
+                width={84}
               />
-              <Tooltip content={<CustomTooltip />} />
-              <Bar dataKey="expectedRevenue" name="Expected">
-                {stageBreakdown.map((entry) => (
-                  <Cell key={entry.stage} fill={entry.color} />
-                ))}
-              </Bar>
+              <Tooltip content={<CustomTooltip />} cursor={{ fill: 'var(--muted)' }} isAnimationActive={false} />
+              <Bar dataKey="expectedRevenue" name="Expected" fill={STAGE_FILL} isAnimationActive={false} />
             </BarChart>
           </ResponsiveContainer>
           <div className="mt-3 space-y-1.5">
             {stageBreakdown.map((s) => (
               <div key={s.stage} className="flex items-center justify-between text-xs">
                 <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full" style={{ background: s.color }} />
                   <span className="text-muted-foreground">{s.stage}</span>
                   <span className="text-muted-foreground/60">({s.dealCount} deals)</span>
                 </div>
@@ -265,7 +268,7 @@ export default function SalesForecastingPanel({ deals, repRows, today }: SalesFo
         </div>
 
         {/* Rep forecasts */}
-        <div className="bg-card border border-border rounded-xl p-5">
+        <div className="bg-card border border-border p-3">
           <h3 className="text-sm font-semibold text-foreground mb-1">Rep Pipeline & Target Achievement</h3>
           <p className="text-xs text-muted-foreground mb-4">Weighted open pipeline, with this month's target achievement</p>
           {repForecasts.length === 0 ? (
@@ -273,21 +276,13 @@ export default function SalesForecastingPanel({ deals, repRows, today }: SalesFo
           ) : (
             <div className="space-y-3">
               {repForecasts.map((rep) => {
+                // Same thresholds as the dashboard: on track 80%+, at risk 60-79%, behind below 60%
                 const barColor =
-                  rep.achievementPct >= 85
-                    ? 'bg-green-500'
-                    : rep.achievementPct >= 70
-                      ? 'bg-accent'
-                      : rep.achievementPct >= 55
-                        ? 'bg-amber-500'
-                        : 'bg-red-400';
+                  rep.achievementPct >= 80 ? 'bg-positive' : rep.achievementPct >= 60 ? 'bg-warning' : 'bg-negative';
                 return (
                   <div key={rep.id} className="space-y-1">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-full bg-accent/20 flex items-center justify-center text-[10px] font-bold text-accent shrink-0">
-                          {rep.rep.split(' ').map((n) => n[0]).join('')}
-                        </div>
                         <span className="text-xs font-semibold text-foreground">{rep.rep}</span>
                       </div>
                       <span className="text-xs text-muted-foreground font-tabular">

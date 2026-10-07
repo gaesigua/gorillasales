@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Plus, Trash2, X } from 'lucide-react';
 import { useConfig } from '@/context/ConfigContext';
 import { adjustStock, receiveStock, recordRoastRun } from '@/actions/inventory';
 import { bestBeforeFrom, roastYieldPct, validateRoast } from '@/lib/domain/inventory';
@@ -18,7 +17,7 @@ function Shell({ title, onClose, children }: { title: string; onClose: () => voi
         <div className="sticky top-0 bg-card border-b border-border px-5 py-3 flex items-center justify-between">
           <h2 className="font-semibold">{title}</h2>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted" aria-label="Close">
-            <X size={18} />
+            Close
           </button>
         </div>
         <div className="p-5 space-y-4">{children}</div>
@@ -183,12 +182,12 @@ export function RoastRunModal({ today, onClose, onSaved }: { today: string; onCl
             onChange={(e) => setLines(lines.map((x) => (x.key === l.key ? { ...x, quantity: e.target.value } : x)))}
           />
           <button onClick={() => setLines(lines.length > 1 ? lines.filter((x) => x.key !== l.key) : lines)} className="p-2 text-muted-foreground hover:text-negative" title="Remove">
-            <Trash2 size={14} />
+            Delete
           </button>
         </div>
       ))}
       <button onClick={() => setLines([...lines, { key: Date.now(), productId: '', quantity: '' }])} className="flex items-center gap-1 text-xs text-accent">
-        <Plus size={12} /> Add line
+         Add line
       </button>
     </div>
   );

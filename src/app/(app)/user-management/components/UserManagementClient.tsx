@@ -6,21 +6,6 @@ import { useUser } from '@/context/UserContext';
 import { resetUserPassword, setUserActive, updateUser } from '@/actions/users';
 import { ROLES, ROLE_LABELS, type Role } from '@/lib/roles';
 import type { ActionResult, ManagedUser as ManagedUserDTO } from '@/lib/types';
-import {
-  Users,
-  ShieldCheck,
-  UserCheck,
-  UserX,
-  KeyRound,
-  Search,
-  ChevronDown,
-  CheckCircle,
-  XCircle,
-  AlertTriangle,
-  Eye,
-  EyeOff,
-  X,
-} from 'lucide-react';
 
 type UserRole = Role;
 type AccountStatus = 'Active' | 'Inactive';
@@ -34,11 +19,11 @@ function toRows(users: ManagedUserDTO[]): ManagedUser[] {
 const ROLE_OPTIONS: UserRole[] = ROLES;
 
 const ROLE_COLORS: Record<UserRole, string> = {
-  ADMIN: 'bg-purple-100 text-purple-700 border-purple-200',
-  MANAGER: 'bg-blue-100 text-blue-700 border-blue-200',
-  SALES_OFFICER: 'bg-green-100 text-green-700 border-green-200',
-  DELIVERY_SUPPORT: 'bg-amber-100 text-amber-700 border-amber-200',
-  DRIVER: 'bg-slate-100 text-slate-600 border-slate-200',
+  ADMIN: 'bg-muted text-foreground border-border',
+  MANAGER: 'bg-info-bg text-info border-info',
+  SALES_OFFICER: 'bg-positive-bg text-positive border-positive',
+  DELIVERY_SUPPORT: 'bg-warning-bg text-warning border-warning',
+  DRIVER: 'bg-muted text-muted-foreground border-border',
 };
 
 interface ResetPasswordModalProps {
@@ -71,11 +56,11 @@ function ResetPasswordModal({ user, onClose, onConfirm }: ResetPasswordModalProp
       <div className="bg-card border border-border rounded-xl shadow-2xl w-full max-w-md">
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <div className="flex items-center gap-2">
-            <KeyRound size={18} className="text-accent" />
+            
             <h2 className="font-semibold text-foreground text-sm">Reset Password</h2>
           </div>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors">
-            <X size={18} />
+            Close
           </button>
         </div>
         <div className="px-5 py-4 space-y-4">
@@ -98,7 +83,7 @@ function ResetPasswordModal({ user, onClose, onConfirm }: ResetPasswordModalProp
                   onClick={() => setShowNew((v) => !v)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 >
-                  {showNew ? <EyeOff size={15} /> : <Eye size={15} />}
+                  {showNew ? null : null}
                 </button>
               </div>
             </div>
@@ -117,14 +102,14 @@ function ResetPasswordModal({ user, onClose, onConfirm }: ResetPasswordModalProp
                   onClick={() => setShowConfirm((v) => !v)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 >
-                  {showConfirm ? <EyeOff size={15} /> : <Eye size={15} />}
+                  {showConfirm ? null : null}
                 </button>
               </div>
             </div>
           </div>
           {error && (
-            <p className="text-xs text-red-600 flex items-center gap-1">
-              <AlertTriangle size={12} /> {error}
+            <p className="text-xs text-negative flex items-center gap-1">
+               {error}
             </p>
           )}
         </div>
@@ -168,7 +153,7 @@ export default function UserManagementClient({ users: initialUsers }: { users: M
   if (!isAdmin && !canViewAllReps) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 px-6">
-        <ShieldCheck size={48} className="text-muted-foreground/40" />
+        
         <div className="text-center">
           <h2 className="text-lg font-semibold text-foreground">Access Restricted</h2>
           <p className="text-sm text-muted-foreground mt-1">
@@ -242,16 +227,16 @@ export default function UserManagementClient({ users: initialUsers }: { users: M
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
-            <Users size={22} className="text-accent" />
+            
             User Management
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             Manage accounts, roles, and access for all system users.
           </p>
         </div>
-        <div className="flex items-center gap-2 px-3 py-1.5 bg-purple-50 border border-purple-200 rounded-lg">
-          <ShieldCheck size={14} className="text-purple-600" />
-          <span className="text-xs font-semibold text-purple-700">Admin View</span>
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-muted border border-border rounded-lg">
+          
+          <span className="text-xs font-semibold text-foreground">Admin View</span>
         </div>
       </div>
 
@@ -263,24 +248,24 @@ export default function UserManagementClient({ users: initialUsers }: { users: M
         </div>
         <div className="bg-card border border-border rounded-xl px-4 py-3">
           <p className="text-xs text-muted-foreground">Active</p>
-          <p className="text-2xl font-bold text-green-600 mt-0.5">{activeCount}</p>
+          <p className="text-2xl font-bold text-positive mt-0.5">{activeCount}</p>
         </div>
         <div className="bg-card border border-border rounded-xl px-4 py-3">
           <p className="text-xs text-muted-foreground">Inactive</p>
-          <p className="text-2xl font-bold text-red-500 mt-0.5">{inactiveCount}</p>
+          <p className="text-2xl font-bold text-negative mt-0.5">{inactiveCount}</p>
         </div>
       </div>
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          
           <input
             type="text"
             placeholder="Search by name or email…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent"
+            className="w-full px-2 py-2 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent"
           />
         </div>
         <select
@@ -331,9 +316,6 @@ export default function UserManagementClient({ users: initialUsers }: { users: M
                     {/* User info */}
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center text-xs font-bold text-primary shrink-0">
-                          {user.initials}
-                        </div>
                         <div className="min-w-0">
                           <p className="font-medium text-foreground truncate">{user.name}</p>
                           <p className="text-xs text-muted-foreground truncate">{user.email}</p>
@@ -351,7 +333,7 @@ export default function UserManagementClient({ users: initialUsers }: { users: M
                           className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border transition-colors hover:opacity-80 ${ROLE_COLORS[user.role]}`}
                         >
                           {ROLE_LABELS[user.role]}
-                          <ChevronDown size={11} />
+                          
                         </button>
                         {openRoleDropdown === user.id && (
                           <div className="absolute top-full left-0 mt-1 bg-card border border-border rounded-lg shadow-xl z-20 min-w-[150px] overflow-hidden">
@@ -377,13 +359,13 @@ export default function UserManagementClient({ users: initialUsers }: { users: M
                     <td className="px-4 py-3">
                       <span
                         className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${
-                          user.status === 'Active' ?'bg-green-50 text-green-700 border-green-200' :'bg-red-50 text-red-600 border-red-200'
+                          user.status === 'Active' ?'bg-positive-bg text-positive border-positive' :'bg-negative-bg text-negative border-negative'
                         }`}
                       >
                         {user.status === 'Active' ? (
-                          <CheckCircle size={11} />
+                          null
                         ) : (
-                          <XCircle size={11} />
+                          null
                         )}
                         {user.status}
                       </span>
@@ -407,13 +389,13 @@ export default function UserManagementClient({ users: initialUsers }: { users: M
                           onClick={() => handleToggleStatus(user.id)}
                           title={user.status === 'Active' ? 'Deactivate account' : 'Activate account'}
                           className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                            user.status === 'Active' ?'bg-red-50 text-red-600 hover:bg-red-100 border border-red-200' :'bg-green-50 text-green-700 hover:bg-green-100 border border-green-200'
+                            user.status === 'Active' ?'bg-negative-bg text-negative hover:bg-negative-bg border border-negative' :'bg-positive-bg text-positive hover:bg-positive-bg border border-positive'
                           }`}
                         >
                           {user.status === 'Active' ? (
-                            <><UserX size={13} /> <span className="hidden sm:inline">Deactivate</span></>
+                            <> <span className="hidden sm:inline">Deactivate</span></>
                           ) : (
-                            <><UserCheck size={13} /> <span className="hidden sm:inline">Activate</span></>
+                            <> <span className="hidden sm:inline">Activate</span></>
                           )}
                         </button>
 
@@ -423,7 +405,7 @@ export default function UserManagementClient({ users: initialUsers }: { users: M
                           title="Reset password"
                           className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-muted hover:bg-accent hover:text-white border border-border transition-colors"
                         >
-                          <KeyRound size={13} />
+                          
                           <span className="hidden sm:inline">Reset PW</span>
                         </button>
                       </div>
@@ -434,7 +416,7 @@ export default function UserManagementClient({ users: initialUsers }: { users: M
             </tbody>
           </table>
         </div>
-        <div className="px-4 py-2.5 border-t border-border bg-muted/20 flex items-center justify-between">
+        <div className="px-4 py-1.5 border-t border-border bg-muted/20 flex items-center justify-between">
           <p className="text-xs text-muted-foreground">
             Showing {filteredUsers.length} of {users.length} users
           </p>
@@ -454,10 +436,10 @@ export default function UserManagementClient({ users: initialUsers }: { users: M
       {toast && (
         <div
           className={`fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg text-sm font-medium transition-all ${
-            toast.type === 'success' ?'bg-green-600 text-white' :'bg-red-600 text-white'
+            toast.type === 'success' ?'bg-positive text-white' :'bg-negative text-white'
           }`}
         >
-          {toast.type === 'success' ? <CheckCircle size={16} /> : <AlertTriangle size={16} />}
+          {toast.type === 'success' ? null : null}
           {toast.message}
         </div>
       )}

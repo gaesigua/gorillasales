@@ -3,7 +3,6 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Toaster, toast } from 'sonner';
-import { ArrowDown, ArrowUp, X } from 'lucide-react';
 import { useConfig } from '@/context/ConfigContext';
 import { deleteRoute, saveRoute } from '@/actions/routes';
 import { WEEKDAY_LABELS } from '@/lib/domain/routes';
@@ -237,7 +236,7 @@ function RouteEditor({
         <div className="sticky top-0 bg-card border-b border-border px-5 py-3 flex items-center justify-between z-10">
           <h2 className="font-semibold">{route ? `Edit ${route.name}` : 'New Route'}</h2>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted" aria-label="Close">
-            <X size={18} />
+            Close
           </button>
         </div>
         <div className="p-5 space-y-4">
@@ -301,13 +300,13 @@ function RouteEditor({
                       {byId.get(id)?.name} <span className="text-muted-foreground">· {byId.get(id)?.area}</span>
                     </span>
                     <button disabled={i === 0} onClick={() => move(i, -1)} className="p-1 disabled:opacity-30" aria-label="Move up">
-                      <ArrowUp size={13} />
+                      Up
                     </button>
                     <button disabled={i === stops.length - 1} onClick={() => move(i, 1)} className="p-1 disabled:opacity-30" aria-label="Move down">
-                      <ArrowDown size={13} />
+                      Down
                     </button>
                     <button onClick={() => setStops((s) => s.filter((x) => x !== id))} className="p-1 text-negative" aria-label="Remove">
-                      <X size={13} />
+                      Close
                     </button>
                   </li>
                 ))}

@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useCallback } from 'react';
-import { Plus, Pencil, Trash2, Check, X, AlertCircle, ChevronDown } from 'lucide-react';
 import { newTempId } from '@/lib/clientId';
 import type { RepMonthlyTarget, SalespersonItem } from '@/lib/types';
 
@@ -147,7 +146,7 @@ export default function MonthlyTargetsEditor({ targets, salespeople, onChange }:
           disabled={addingNew}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent text-white text-xs font-semibold hover:bg-accent/90 transition-colors disabled:opacity-50 shrink-0"
         >
-          <Plus size={13} />
+          
           Add Target
         </button>
       </div>
@@ -163,7 +162,7 @@ export default function MonthlyTargetsEditor({ targets, salespeople, onChange }:
             <option value="">All Reps</option>
             {salespeople.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}
           </select>
-          <ChevronDown size={11} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+          
         </div>
         <div className="relative">
           <select
@@ -174,7 +173,7 @@ export default function MonthlyTargetsEditor({ targets, salespeople, onChange }:
             <option value="">All Years</option>
             {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
           </select>
-          <ChevronDown size={11} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+          
         </div>
         <span className="text-xs text-muted-foreground ml-auto">{filtered.length} record{filtered.length !== 1 ? 's' : ''}</span>
       </div>
@@ -182,7 +181,7 @@ export default function MonthlyTargetsEditor({ targets, salespeople, onChange }:
       {/* Error */}
       {error && (
         <div className="mx-4 mt-3 px-3 py-2 rounded-lg bg-negative/10 border border-negative/20 flex items-center gap-2 text-negative text-xs">
-          <AlertCircle size={13} />
+          
           {error}
         </div>
       )}
@@ -192,12 +191,12 @@ export default function MonthlyTargetsEditor({ targets, salespeople, onChange }:
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border bg-muted/30">
-              <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Rep</th>
-              <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Month</th>
-              <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Year</th>
-              <th className="text-right px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Target (RWF)</th>
-              <th className="text-right px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Target (KG)</th>
-              <th className="px-4 py-2.5 w-20"></th>
+              <th className="text-left px-4 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Rep</th>
+              <th className="text-left px-4 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Month</th>
+              <th className="text-left px-4 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Year</th>
+              <th className="text-right px-4 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Target (RWF)</th>
+              <th className="text-right px-4 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Target (KG)</th>
+              <th className="px-4 py-1.5 w-20"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -215,7 +214,7 @@ export default function MonthlyTargetsEditor({ targets, salespeople, onChange }:
                       <option value="">Select rep…</option>
                       {salespeople.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}
                     </select>
-                    <ChevronDown size={11} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                    
                   </div>
                 </td>
                 <td className="px-3 py-2">
@@ -227,7 +226,7 @@ export default function MonthlyTargetsEditor({ targets, salespeople, onChange }:
                     >
                       {MONTHS.map((m, i) => <option key={m} value={i}>{m}</option>)}
                     </select>
-                    <ChevronDown size={11} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                    
                   </div>
                 </td>
                 <td className="px-3 py-2">
@@ -239,7 +238,7 @@ export default function MonthlyTargetsEditor({ targets, salespeople, onChange }:
                     >
                       {YEARS.map(y => <option key={y} value={Number(y)}>{y}</option>)}
                     </select>
-                    <ChevronDown size={11} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                    
                   </div>
                 </td>
                 <td className="px-3 py-2">
@@ -268,8 +267,8 @@ export default function MonthlyTargetsEditor({ targets, salespeople, onChange }:
                 </td>
                 <td className="px-3 py-2">
                   <div className="flex items-center gap-1 justify-end">
-                    <button onClick={confirmAdd} className="p-1.5 rounded-lg bg-positive text-white hover:bg-positive/90 transition-colors" title="Save"><Check size={12} /></button>
-                    <button onClick={cancelAdd} className="p-1.5 rounded-lg bg-muted text-muted-foreground hover:bg-muted/80 transition-colors" title="Cancel"><X size={12} /></button>
+                    <button onClick={confirmAdd} className="p-1.5 rounded-lg bg-positive text-white hover:bg-positive/90 transition-colors" title="Save">Save</button>
+                    <button onClick={cancelAdd} className="p-1.5 rounded-lg bg-muted text-muted-foreground hover:bg-muted/80 transition-colors" title="Cancel">Close</button>
                   </div>
                 </td>
               </tr>
@@ -297,7 +296,7 @@ export default function MonthlyTargetsEditor({ targets, salespeople, onChange }:
                         >
                           {salespeople.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}
                         </select>
-                        <ChevronDown size={11} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                        
                       </div>
                     </td>
                     <td className="px-3 py-2">
@@ -309,7 +308,7 @@ export default function MonthlyTargetsEditor({ targets, salespeople, onChange }:
                         >
                           {MONTHS.map((m, i) => <option key={m} value={i}>{m}</option>)}
                         </select>
-                        <ChevronDown size={11} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                        
                       </div>
                     </td>
                     <td className="px-3 py-2">
@@ -321,7 +320,7 @@ export default function MonthlyTargetsEditor({ targets, salespeople, onChange }:
                         >
                           {YEARS.map(y => <option key={y} value={Number(y)}>{y}</option>)}
                         </select>
-                        <ChevronDown size={11} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                        
                       </div>
                     </td>
                     <td className="px-3 py-2">
@@ -348,21 +347,21 @@ export default function MonthlyTargetsEditor({ targets, salespeople, onChange }:
                     </td>
                     <td className="px-3 py-2">
                       <div className="flex items-center gap-1 justify-end">
-                        <button onClick={saveEdit} className="p-1.5 rounded-lg bg-positive text-white hover:bg-positive/90 transition-colors" title="Save"><Check size={12} /></button>
-                        <button onClick={cancelEdit} className="p-1.5 rounded-lg bg-muted text-muted-foreground hover:bg-muted/80 transition-colors" title="Cancel"><X size={12} /></button>
+                        <button onClick={saveEdit} className="p-1.5 rounded-lg bg-positive text-white hover:bg-positive/90 transition-colors" title="Save">Save</button>
+                        <button onClick={cancelEdit} className="p-1.5 rounded-lg bg-muted text-muted-foreground hover:bg-muted/80 transition-colors" title="Cancel">Close</button>
                       </div>
                     </td>
                   </>
                 ) : (
                   <>
-                    <td className="px-4 py-2.5 text-sm font-medium text-foreground">{t.repName}</td>
-                    <td className="px-4 py-2.5 text-sm text-muted-foreground">{MONTHS[t.month]}</td>
-                    <td className="px-4 py-2.5 text-sm text-muted-foreground">{t.year}</td>
-                    <td className="px-4 py-2.5 text-sm font-tabular font-semibold text-foreground text-right">{formatRWF(t.targetAmount)}</td>
-                    <td className="px-4 py-2.5 text-sm font-tabular font-semibold text-foreground text-right">{(t.targetWeightKg ?? 0).toLocaleString()} KG</td>
-                    <td className="px-4 py-2.5">
+                    <td className="px-4 py-1.5 text-sm font-medium text-foreground">{t.repName}</td>
+                    <td className="px-4 py-1.5 text-sm text-muted-foreground">{MONTHS[t.month]}</td>
+                    <td className="px-4 py-1.5 text-sm text-muted-foreground">{t.year}</td>
+                    <td className="px-4 py-1.5 text-sm font-tabular font-semibold text-foreground text-right">{formatRWF(t.targetAmount)}</td>
+                    <td className="px-4 py-1.5 text-sm font-tabular font-semibold text-foreground text-right">{(t.targetWeightKg ?? 0).toLocaleString()} KG</td>
+                    <td className="px-4 py-1.5">
                       <div className="flex items-center gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => startEdit(t)} className="p-1.5 rounded-lg text-muted-foreground hover:text-accent hover:bg-accent/10 transition-colors" title="Edit"><Pencil size={12} /></button>
+                        <button onClick={() => startEdit(t)} className="p-1.5 rounded-lg text-muted-foreground hover:text-accent hover:bg-accent/10 transition-colors" title="Edit">Edit</button>
                         {deleteConfirmId === t.id ? (
                           <div className="flex items-center gap-1">
                             <span className="text-xs text-negative font-medium">Delete?</span>
@@ -370,7 +369,7 @@ export default function MonthlyTargetsEditor({ targets, salespeople, onChange }:
                             <button onClick={() => setDeleteConfirmId(null)} className="p-1 rounded bg-muted text-muted-foreground text-xs hover:bg-muted/80 transition-colors">No</button>
                           </div>
                         ) : (
-                          <button onClick={() => setDeleteConfirmId(t.id)} className="p-1.5 rounded-lg text-muted-foreground hover:text-negative hover:bg-negative/10 transition-colors" title="Delete"><Trash2 size={12} /></button>
+                          <button onClick={() => setDeleteConfirmId(t.id)} className="p-1.5 rounded-lg text-muted-foreground hover:text-negative hover:bg-negative/10 transition-colors" title="Delete">Delete</button>
                         )}
                       </div>
                     </td>
@@ -383,7 +382,7 @@ export default function MonthlyTargetsEditor({ targets, salespeople, onChange }:
       </div>
 
       {/* Footer */}
-      <div className="px-5 py-2.5 border-t border-border bg-muted/20">
+      <div className="px-5 py-1.5 border-t border-border bg-muted/20">
         <span className="text-xs text-muted-foreground">{targets.length} total target{targets.length !== 1 ? 's' : ''}</span>
       </div>
     </div>

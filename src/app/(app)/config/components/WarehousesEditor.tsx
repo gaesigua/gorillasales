@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
 import { saveWarehouses } from '@/actions/config';
 import { newTempId } from '@/lib/clientId';
 import type { WarehouseDTO } from '@/lib/types';
@@ -39,7 +38,7 @@ export default function WarehousesEditor({ warehouses, onSaved }: WarehousesEdit
   const inputClass = 'border border-border rounded-md px-2 py-1.5 text-sm bg-background w-full';
 
   return (
-    <div className="bg-card border border-border rounded-xl p-5 space-y-4">
+    <div className="bg-card border border-border p-3 space-y-4">
       <div>
         <h3 className="font-semibold text-sm">Warehouses</h3>
         <p className="text-xs text-muted-foreground mt-0.5">
@@ -81,7 +80,7 @@ export default function WarehousesEditor({ warehouses, onSaved }: WarehousesEdit
                   className="p-1.5 rounded-lg text-muted-foreground hover:text-negative disabled:opacity-30"
                   title="Remove"
                 >
-                  <Trash2 size={13} />
+                  Delete
                 </button>
               </td>
             </tr>
@@ -93,7 +92,7 @@ export default function WarehousesEditor({ warehouses, onSaved }: WarehousesEdit
           onClick={() => setRows((r) => [...r, { id: newTempId('wh'), name: '', address: '', isDefault: false }])}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-sm hover:bg-muted"
         >
-          <Plus size={14} /> Add warehouse
+           Add warehouse
         </button>
         <button onClick={save} disabled={busy} className="px-4 py-1.5 text-sm font-semibold bg-primary text-primary-foreground rounded-lg disabled:opacity-60">
           {busy ? 'Saving...' : 'Save warehouses'}

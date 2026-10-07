@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { toast, Toaster } from 'sonner';
-import { LayoutGrid, List, TrendingUp, ChevronDown, GripVertical, Calendar, User, MapPin, ArrowRight, Filter, Download, FileText } from 'lucide-react';
 import { formatRWF } from '@/lib/format';
 import { useConfig } from '@/context/ConfigContext';
 import type { PipelineDeal, PipelineStage, RepPerformanceRow } from '@/lib/types';
@@ -13,13 +12,13 @@ import { updateDealStage } from '@/actions/deals';
 type StageColors = { bg: string; text: string; border: string; dot: string };
 
 const OPEN_STAGE_COLORS: StageColors[] = [
-  { bg: 'bg-slate-100', text: 'text-slate-700', border: 'border-slate-200', dot: 'bg-slate-400' },
-  { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200', dot: 'bg-blue-400' },
-  { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200', dot: 'bg-amber-400' },
-  { bg: 'bg-orange-50', text: 'text-orange-700', border: 'border-orange-200', dot: 'bg-orange-500' },
+  { bg: 'bg-muted', text: 'text-foreground', border: 'border-border', dot: 'bg-foreground' },
+  { bg: 'bg-info-bg', text: 'text-info', border: 'border-info', dot: 'bg-info' },
+  { bg: 'bg-warning-bg', text: 'text-warning', border: 'border-warning', dot: 'bg-warning' },
+  { bg: 'bg-warning-bg', text: 'text-warning', border: 'border-warning', dot: 'bg-warning' },
 ];
-const WON_COLORS: StageColors = { bg: 'bg-green-50', text: 'text-green-700', border: 'border-green-200', dot: 'bg-green-500' };
-const LOST_COLORS: StageColors = { bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200', dot: 'bg-red-400' };
+const WON_COLORS: StageColors = { bg: 'bg-positive-bg', text: 'text-positive', border: 'border-positive', dot: 'bg-positive' };
+const LOST_COLORS: StageColors = { bg: 'bg-negative-bg', text: 'text-negative', border: 'border-negative', dot: 'bg-negative' };
 
 function stageColors(stages: PipelineStage[], name: string): StageColors {
   const stage = stages.find((s) => s.name === name);
@@ -229,7 +228,7 @@ export default function SalesPipelineClient({ deals: initialDeals, repRows, toda
                 viewMode === 'kanban' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
               }`}
             >
-              <LayoutGrid size={15} />
+              
               <span className="hidden sm:inline">Kanban</span>
             </button>
             <button
@@ -238,7 +237,7 @@ export default function SalesPipelineClient({ deals: initialDeals, repRows, toda
                 viewMode === 'table' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
               }`}
             >
-              <List size={15} />
+              
               <span className="hidden sm:inline">Table</span>
             </button>
           </div>
@@ -248,7 +247,7 @@ export default function SalesPipelineClient({ deals: initialDeals, repRows, toda
             className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border bg-card text-foreground text-sm font-medium hover:bg-muted transition-colors"
             title="Download CSV"
           >
-            <Download size={14} />
+            
             <span className="hidden sm:inline">CSV</span>
           </button>
           <button
@@ -256,7 +255,7 @@ export default function SalesPipelineClient({ deals: initialDeals, repRows, toda
             className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border bg-card text-foreground text-sm font-medium hover:bg-muted transition-colors"
             title="Download PDF"
           >
-            <FileText size={14} />
+            
             <span className="hidden sm:inline">PDF</span>
           </button>
         </div>
@@ -264,7 +263,7 @@ export default function SalesPipelineClient({ deals: initialDeals, repRows, toda
 
       {exportMsg && (
         <div className="flex items-center gap-2 bg-positive/10 border border-positive/30 text-positive text-sm px-4 py-3 rounded-lg">
-          <FileText size={15} />
+          
           {exportMsg}
         </div>
       )}
@@ -283,7 +282,7 @@ export default function SalesPipelineClient({ deals: initialDeals, repRows, toda
         </div>
         <div className="bg-card border border-border rounded-xl p-4">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Won This Month</p>
-          <p className="text-xl font-bold text-green-600 font-tabular">{formatRWF(wonValue)}</p>
+          <p className="text-xl font-bold text-positive font-tabular">{formatRWF(wonValue)}</p>
           <p className="text-xs text-muted-foreground mt-0.5">{wonDeals.length} deals closed</p>
         </div>
         <div className="bg-card border border-border rounded-xl p-4">
@@ -295,7 +294,7 @@ export default function SalesPipelineClient({ deals: initialDeals, repRows, toda
 
       {/* Filters */}
       <div className="flex flex-wrap gap-3 items-center">
-        <Filter size={14} className="text-muted-foreground" />
+        
         {canViewAllReps && (
           <div className="relative">
             <select
@@ -308,7 +307,7 @@ export default function SalesPipelineClient({ deals: initialDeals, repRows, toda
                 <option key={s.id} value={s.id}>{s.label}</option>
               ))}
             </select>
-            <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+            
           </div>
         )}
         <div className="relative">
@@ -322,7 +321,7 @@ export default function SalesPipelineClient({ deals: initialDeals, repRows, toda
               <option key={s} value={s}>{s}</option>
             ))}
           </select>
-          <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+          
         </div>
         {(repFilter || stageFilter) && (
           <button
@@ -382,7 +381,7 @@ export default function SalesPipelineClient({ deals: initialDeals, repRows, toda
                         {/* Card top */}
                         <div className="flex items-start justify-between gap-2 mb-2">
                           <p className="text-sm font-semibold text-foreground leading-tight">{deal.customer}</p>
-                          <GripVertical size={14} className="text-muted-foreground shrink-0 mt-0.5" />
+                          
                         </div>
 
                         {/* Value + probability */}
@@ -397,7 +396,7 @@ export default function SalesPipelineClient({ deals: initialDeals, repRows, toda
 
                         {/* Weighted */}
                         <div className="flex items-center gap-1 mb-2">
-                          <TrendingUp size={11} className="text-accent" />
+                          
                           <span className="text-xs text-muted-foreground">
                             Weighted: <span className="font-semibold text-accent font-tabular">{formatRWF(deal.weightedValue)}</span>
                           </span>
@@ -414,11 +413,11 @@ export default function SalesPipelineClient({ deals: initialDeals, repRows, toda
                         {/* Meta */}
                         <div className="space-y-1">
                           <div className="flex items-center gap-1.5">
-                            <User size={11} className="text-muted-foreground" />
+                            
                             <span className="text-xs text-muted-foreground truncate">{deal.salesperson}</span>
                           </div>
                           <div className="flex items-center gap-1.5">
-                            <Calendar size={11} className="text-muted-foreground" />
+                            
                             <span className="text-xs text-muted-foreground">Follow-up: {deal.followUpDate}</span>
                           </div>
                         </div>
@@ -427,7 +426,7 @@ export default function SalesPipelineClient({ deals: initialDeals, repRows, toda
                         {deal.nextAction && (
                           <div className="mt-2 pt-2 border-t border-border">
                             <p className="text-[11px] text-muted-foreground flex items-start gap-1">
-                              <ArrowRight size={10} className="shrink-0 mt-0.5 text-accent" />
+                              
                               {deal.nextAction}
                             </p>
                           </div>
@@ -487,15 +486,12 @@ export default function SalesPipelineClient({ deals: initialDeals, repRows, toda
                       <td className="px-4 py-3">
                         <p className="font-semibold text-foreground">{deal.customer}</p>
                         <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                          <MapPin size={10} />
+                          
                           {deal.area}
                         </p>
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 rounded-full bg-accent/20 flex items-center justify-center text-[10px] font-bold text-accent shrink-0">
-                            {deal.salesperson.split(' ').map((n) => n[0]).join('')}
-                          </div>
                           <span className="text-foreground text-xs">{deal.salesperson}</span>
                         </div>
                       </td>

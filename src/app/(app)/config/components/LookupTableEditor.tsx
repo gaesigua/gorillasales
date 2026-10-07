@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useCallback } from 'react';
-import { Plus, Pencil, Trash2, GripVertical, Check, X, AlertCircle } from 'lucide-react';
 import { newTempId } from '@/lib/clientId';
 
 export interface ConfigItem {
@@ -127,7 +126,7 @@ export default function LookupTableEditor({
           disabled={addingNew}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent text-white text-xs font-semibold hover:bg-accent/90 transition-colors disabled:opacity-50 shrink-0"
         >
-          <Plus size={13} />
+          
           Add
         </button>
       </div>
@@ -135,7 +134,7 @@ export default function LookupTableEditor({
       {/* Error banner */}
       {error && (
         <div className="mx-4 mt-3 px-3 py-2 rounded-lg bg-negative/10 border border-negative/20 flex items-center gap-2 text-negative text-xs">
-          <AlertCircle size={13} />
+          
           {error}
         </div>
       )}
@@ -149,7 +148,7 @@ export default function LookupTableEditor({
         )}
 
         {items.map((item, index) => (
-          <li key={item.id} className="px-4 py-2.5 flex items-center gap-2 group hover:bg-muted/30 transition-colors">
+          <li key={item.id} className="px-4 py-1.5 flex items-center gap-2 group hover:bg-muted/30 transition-colors">
             {/* Reorder */}
             <div className="flex flex-col gap-0.5 shrink-0">
               <button
@@ -158,7 +157,7 @@ export default function LookupTableEditor({
                 className="p-0.5 rounded text-muted-foreground/40 hover:text-muted-foreground disabled:opacity-20 transition-colors"
                 title="Move up"
               >
-                <GripVertical size={14} className="rotate-90" />
+                
               </button>
             </div>
 
@@ -189,10 +188,10 @@ export default function LookupTableEditor({
                 )}
                 <div className="flex items-center gap-1">
                   <button onClick={saveEdit} className="p-1.5 rounded-lg bg-positive text-white hover:bg-positive/90 transition-colors" title="Save">
-                    <Check size={13} />
+                    Save
                   </button>
                   <button onClick={cancelEdit} className="p-1.5 rounded-lg bg-muted text-muted-foreground hover:bg-muted/80 transition-colors" title="Cancel">
-                    <X size={13} />
+                    Close
                   </button>
                 </div>
               </div>
@@ -211,7 +210,7 @@ export default function LookupTableEditor({
                     className="p-1.5 rounded-lg text-muted-foreground hover:text-accent hover:bg-accent/10 transition-colors"
                     title="Edit"
                   >
-                    <Pencil size={13} />
+                    Edit
                   </button>
                   {deleteConfirmId === item.id ? (
                     <div className="flex items-center gap-1">
@@ -225,7 +224,7 @@ export default function LookupTableEditor({
                       className="p-1.5 rounded-lg text-muted-foreground hover:text-negative hover:bg-negative/10 transition-colors"
                       title="Delete"
                     >
-                      <Trash2 size={13} />
+                      Delete
                     </button>
                   )}
                 </div>
@@ -259,10 +258,10 @@ export default function LookupTableEditor({
             )}
             <div className="flex items-center gap-1">
               <button onClick={confirmAdd} className="p-1.5 rounded-lg bg-positive text-white hover:bg-positive/90 transition-colors" title="Add">
-                <Check size={13} />
+                Save
               </button>
               <button onClick={cancelAdd} className="p-1.5 rounded-lg bg-muted text-muted-foreground hover:bg-muted/80 transition-colors" title="Cancel">
-                <X size={13} />
+                Close
               </button>
             </div>
           </li>
@@ -270,7 +269,7 @@ export default function LookupTableEditor({
       </ul>
 
       {/* Footer count */}
-      <div className="px-5 py-2.5 border-t border-border bg-muted/20">
+      <div className="px-5 py-1.5 border-t border-border bg-muted/20">
         <span className="text-xs text-muted-foreground">{items.length} {items.length === 1 ? 'entry' : 'entries'}</span>
       </div>
     </div>

@@ -30,7 +30,7 @@ export default function TaxSettingsEditor({ settings }: { settings: Organization
   const inputClass = 'border border-border rounded-lg px-3 py-2 text-sm bg-background w-full disabled:bg-muted/40';
 
   return (
-    <div className="bg-card border border-border rounded-xl p-5 space-y-4 max-w-xl">
+    <div className="bg-card border border-border p-3 space-y-4 max-w-xl">
       <div>
         <h3 className="font-semibold text-sm">Tax &amp; Invoicing — {settings.name}</h3>
         <p className="text-xs text-muted-foreground mt-0.5">

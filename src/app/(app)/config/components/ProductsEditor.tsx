@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Plus, Pencil, Trash2, Check, X, AlertCircle } from 'lucide-react';
 import { newTempId } from '@/lib/clientId';
 import type { ProductItem } from '@/lib/types';
 
@@ -113,8 +112,8 @@ export default function ProductsEditor({ products, onChange }: ProductsEditorPro
       <td className="px-3 py-2"><input className={inputClass} type="number" min="1" placeholder="none" value={form.shelfLifeDays} onChange={(e) => setForm({ ...form, shelfLifeDays: e.target.value })} /></td>
       <td className="px-3 py-2">
         <div className="flex items-center justify-end gap-1">
-          <button onClick={save} className="p-1.5 rounded-md bg-accent text-white hover:bg-accent/90" title="Save"><Check size={13} /></button>
-          <button onClick={cancel} className="p-1.5 rounded-md bg-muted text-muted-foreground hover:bg-muted/80" title="Cancel"><X size={13} /></button>
+          <button onClick={save} className="p-1.5 rounded-md bg-accent text-white hover:bg-accent/90" title="Save">Save</button>
+          <button onClick={cancel} className="p-1.5 rounded-md bg-muted text-muted-foreground hover:bg-muted/80" title="Cancel">Close</button>
         </div>
       </td>
     </tr>
@@ -139,13 +138,13 @@ export default function ProductsEditor({ products, onChange }: ProductsEditorPro
           disabled={editingId !== null}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent text-white text-xs font-semibold hover:bg-accent/90 disabled:opacity-50 shrink-0"
         >
-          <Plus size={13} /> Add product
+           Add product
         </button>
       </div>
 
       {error && (
         <div className="mx-5 mt-3 flex items-center gap-2 text-xs text-negative bg-negative-bg border border-negative/20 rounded-lg px-3 py-2">
-          <AlertCircle size={13} /> {error}
+           {error}
         </div>
       )}
 
@@ -153,15 +152,15 @@ export default function ProductsEditor({ products, onChange }: ProductsEditorPro
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-muted/40 text-[11px] uppercase tracking-wider text-muted-foreground">
-              <th className="px-3 py-2.5 text-left font-semibold">Name</th>
-              <th className="px-3 py-2.5 text-left font-semibold">SKU</th>
-              <th className="px-3 py-2.5 text-left font-semibold">Category</th>
-              <th className="px-3 py-2.5 text-right font-semibold">Unit Price (RWF)</th>
-              <th className="px-3 py-2.5 text-left font-semibold">Unit</th>
-              <th className="px-3 py-2.5 text-right font-semibold">KG / Unit</th>
-              <th className="px-3 py-2.5 text-left font-semibold">Kind</th>
-              <th className="px-3 py-2.5 text-right font-semibold">Shelf Life (days)</th>
-              <th className="px-3 py-2.5" />
+              <th className="px-3 py-1.5 text-left font-semibold">Name</th>
+              <th className="px-3 py-1.5 text-left font-semibold">SKU</th>
+              <th className="px-3 py-1.5 text-left font-semibold">Category</th>
+              <th className="px-3 py-1.5 text-right font-semibold">Unit Price (RWF)</th>
+              <th className="px-3 py-1.5 text-left font-semibold">Unit</th>
+              <th className="px-3 py-1.5 text-right font-semibold">KG / Unit</th>
+              <th className="px-3 py-1.5 text-left font-semibold">Kind</th>
+              <th className="px-3 py-1.5 text-right font-semibold">Shelf Life (days)</th>
+              <th className="px-3 py-1.5" />
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -170,15 +169,15 @@ export default function ProductsEditor({ products, onChange }: ProductsEditorPro
                 <React.Fragment key={p.id}>{formRow}</React.Fragment>
               ) : (
                 <tr key={p.id} className="hover:bg-muted/30">
-                  <td className="px-3 py-2.5 font-medium text-foreground">{p.label}</td>
-                  <td className="px-3 py-2.5 text-muted-foreground">{p.sku || '—'}</td>
-                  <td className="px-3 py-2.5 text-muted-foreground">{p.category}</td>
-                  <td className="px-3 py-2.5 text-right font-tabular">{p.unitPrice.toLocaleString()}</td>
-                  <td className="px-3 py-2.5 text-muted-foreground">{p.unitOfMeasure}</td>
-                  <td className="px-3 py-2.5 text-right font-tabular">{p.weightKg}</td>
-                  <td className="px-3 py-2.5 text-muted-foreground">{p.kind === 'GREEN' ? 'Green' : 'Finished'}</td>
-                  <td className="px-3 py-2.5 text-right font-tabular">{p.shelfLifeDays ?? '—'}</td>
-                  <td className="px-3 py-2.5">
+                  <td className="px-3 py-1.5 font-medium text-foreground">{p.label}</td>
+                  <td className="px-3 py-1.5 text-muted-foreground">{p.sku || '—'}</td>
+                  <td className="px-3 py-1.5 text-muted-foreground">{p.category}</td>
+                  <td className="px-3 py-1.5 text-right font-tabular">{p.unitPrice.toLocaleString()}</td>
+                  <td className="px-3 py-1.5 text-muted-foreground">{p.unitOfMeasure}</td>
+                  <td className="px-3 py-1.5 text-right font-tabular">{p.weightKg}</td>
+                  <td className="px-3 py-1.5 text-muted-foreground">{p.kind === 'GREEN' ? 'Green' : 'Finished'}</td>
+                  <td className="px-3 py-1.5 text-right font-tabular">{p.shelfLifeDays ?? '—'}</td>
+                  <td className="px-3 py-1.5">
                     <div className="flex items-center justify-end gap-1">
                       {deleteConfirmId === p.id ? (
                         <>
@@ -207,7 +206,7 @@ export default function ProductsEditor({ products, onChange }: ProductsEditorPro
                             className="p-1.5 rounded-lg text-muted-foreground hover:text-accent hover:bg-accent/10 disabled:opacity-40"
                             title="Edit"
                           >
-                            <Pencil size={12} />
+                            Edit
                           </button>
                           <button
                             onClick={() => setDeleteConfirmId(p.id)}
@@ -215,7 +214,7 @@ export default function ProductsEditor({ products, onChange }: ProductsEditorPro
                             className="p-1.5 rounded-lg text-muted-foreground hover:text-negative hover:bg-negative/10 disabled:opacity-40"
                             title="Remove"
                           >
-                            <Trash2 size={12} />
+                            Delete
                           </button>
                         </>
                       )}

@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { Search, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Eye, X, AlertTriangle, Download, Plus } from 'lucide-react';
 import { formatRWF } from '@/lib/format';
 import type { Customer, VisitLog } from '@/lib/types';
 import Badge from '@/components/ui/Badge';
@@ -19,23 +18,9 @@ function getStatusVariant(status: string) {
   return 'info';
 }
 
-function getCategoryBadgeColor(category: string) {
-  const map: Record<string, string> = {
-    'Hotels': 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
-    'Coffee Shops': 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
-    'Wholesalers': 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
-    'Supermarkets': 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
-    'Shops': 'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-300',
-    'Stores': 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
-    'Galleries': 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300',
-    'Offices': 'bg-slate-100 text-slate-600 dark:bg-slate-800/50 dark:text-slate-300',
-  };
-  return map[category] ?? 'bg-muted text-muted-foreground';
-}
-
 function getCapacityColor(pct: number) {
   if (pct >= 70) return 'bg-positive';
-  if (pct >= 40) return 'bg-accent';
+  if (pct >= 40) return 'bg-warning';
   return 'bg-negative';
 }
 
@@ -134,12 +119,12 @@ export default function CustomerTableClient({ customers, recentVisits, today }: 
   const SortIcon = ({ col }: { col: SortKey }) =>
     sortKey === col ? (
       sortDir === 'asc' ? (
-        <ChevronUp size={11} className="text-accent" />
+        <span aria-hidden="true">▲</span>
       ) : (
-        <ChevronDown size={11} className="text-accent" />
+        <span aria-hidden="true">▼</span>
       )
     ) : (
-      <ChevronDown size={11} className="text-muted-foreground opacity-30" />
+      <span aria-hidden="true">▼</span>
     );
 
   // Summary stats
@@ -191,14 +176,14 @@ export default function CustomerTableClient({ customers, recentVisits, today }: 
               onClick={() => setShowExport(true)}
               className="inline-flex items-center gap-2 px-4 py-2 bg-card border border-border text-foreground text-sm font-semibold rounded-lg hover:bg-muted transition-colors active:scale-95"
             >
-              <Download size={15} />
+              
               Weekly Report
             </button>
             <button
               onClick={() => setFormCustomer('new')}
               className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground text-sm font-semibold rounded-lg hover:bg-primary/90 transition-colors active:scale-95"
             >
-              <Plus size={15} />
+              
               Add Customer
             </button>
           </div>
@@ -226,7 +211,7 @@ export default function CustomerTableClient({ customers, recentVisits, today }: 
           >
             <div className="flex items-center gap-1.5">
               {overdueCount > 0 && (
-                <AlertTriangle size={12} className="text-negative" />
+                null
               )}
               <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
                 Overdue Follow-ups
@@ -251,11 +236,11 @@ export default function CustomerTableClient({ customers, recentVisits, today }: 
         </div>
 
         {/* Category breakdown strip */}
-        <div className="bg-card border border-border rounded-xl px-5 py-4">
+        <div className="bg-card border border-border px-3 py-2">
           <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground mb-3">
             Customers by Category
           </p>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-x-4 gap-y-1">
             {customerCategories.map((cat) => {
               const count = categoryBreakdown[cat] || 0;
               return (
@@ -265,18 +250,9 @@ export default function CustomerTableClient({ customers, recentVisits, today }: 
                     setFilterCategory(filterCategory === cat ? '' : cat);
                     setPage(1);
                   }}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
-                    filterCategory === cat
-                      ? 'bg-primary text-primary-foreground border-primary'
-                      : `${getCategoryBadgeColor(cat)} border-transparent hover:opacity-80`
-                  }`}
+                  className={`text-sm underline ${filterCategory === cat ? 'font-bold text-foreground' : 'text-link'}`}
                 >
-                  {cat}
-                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                    filterCategory === cat ? 'bg-white/20' : 'bg-black/10'
-                  }`}>
-                    {count}
-                  </span>
+                  {cat} ({count})
                 </button>
               );
             })}
@@ -287,23 +263,20 @@ export default function CustomerTableClient({ customers, recentVisits, today }: 
         <div className="bg-card border border-border rounded-xl p-4">
           <div className="flex flex-wrap items-center gap-3">
             <div className="relative flex-1 min-w-[200px]">
-              <Search
-                size={15}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-              />
+              
               <input
                 type="text"
                 placeholder="Search customers, areas, reps..."
                 value={search}
                 onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-                className="w-full bg-input border border-border rounded-lg pl-9 pr-3 py-2.5 text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-colors"
+                className="w-full bg-input border border-border rounded-lg px-2 py-1.5 text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-colors"
               />
             </div>
 
             <select
               value={filterCategory}
               onChange={(e) => { setFilterCategory(e.target.value); setPage(1); }}
-              className="bg-input border border-border rounded-lg px-4 py-2.5 text-base text-foreground focus:outline-none focus:ring-2 focus:ring-ring cursor-pointer transition-colors"
+              className="bg-input border border-border rounded-lg px-4 py-1.5 text-base text-foreground focus:outline-none focus:ring-2 focus:ring-ring cursor-pointer transition-colors"
             >
               <option value="">All Categories</option>
               {customerCategories.map((cat) => (
@@ -317,7 +290,7 @@ export default function CustomerTableClient({ customers, recentVisits, today }: 
               <select
                 value={filterSalesperson}
                 onChange={(e) => { setFilterSalesperson(e.target.value); setPage(1); }}
-                className="bg-input border border-border rounded-lg px-4 py-2.5 text-base text-foreground focus:outline-none focus:ring-2 focus:ring-ring cursor-pointer transition-colors"
+                className="bg-input border border-border rounded-lg px-4 py-1.5 text-base text-foreground focus:outline-none focus:ring-2 focus:ring-ring cursor-pointer transition-colors"
               >
                 <option value="">All Reps</option>
                 {salespeople.map((sp) => (
@@ -336,7 +309,7 @@ export default function CustomerTableClient({ customers, recentVisits, today }: 
             <select
               value={filterStatus}
               onChange={(e) => { setFilterStatus(e.target.value); setPage(1); }}
-              className="bg-input border border-border rounded-lg px-4 py-2.5 text-base text-foreground focus:outline-none focus:ring-2 focus:ring-ring cursor-pointer transition-colors"
+              className="bg-input border border-border rounded-lg px-4 py-1.5 text-base text-foreground focus:outline-none focus:ring-2 focus:ring-ring cursor-pointer transition-colors"
             >
               <option value="">All Statuses</option>
               <option value="Active">Active</option>
@@ -349,7 +322,7 @@ export default function CustomerTableClient({ customers, recentVisits, today }: 
                 onClick={clearFilters}
                 className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground border border-border rounded-lg px-3 py-2 hover:bg-muted transition-colors"
               >
-                <X size={13} />
+                
                 Clear filters
               </button>
             )}
@@ -404,9 +377,6 @@ export default function CustomerTableClient({ customers, recentVisits, today }: 
                   <tr>
                     <td colSpan={12} className="px-4 py-16 text-center">
                       <div className="flex flex-col items-center gap-3">
-                        <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center">
-                          <Search size={20} className="text-muted-foreground" />
-                        </div>
                         <p className="text-sm font-semibold text-foreground">
                           No customers match your filters
                         </p>
@@ -441,13 +411,6 @@ export default function CustomerTableClient({ customers, recentVisits, today }: 
                         {/* Customer name */}
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
-                            <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary shrink-0">
-                              {customer.name
-                                .split(' ')
-                                .slice(0, 2)
-                                .map((w) => w[0])
-                                .join('')}
-                            </div>
                             <div className="min-w-0">
                               <p className="text-sm font-semibold text-foreground truncate max-w-[160px]">
                                 {customer.name}
@@ -461,9 +424,7 @@ export default function CustomerTableClient({ customers, recentVisits, today }: 
 
                         {/* Category */}
                         <td className="px-4 py-3">
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold ${getCategoryBadgeColor(customer.category)}`}>
-                            {customer.category}
-                          </span>
+                          {customer.category}
                         </td>
 
                         {/* Area */}
@@ -543,7 +504,7 @@ export default function CustomerTableClient({ customers, recentVisits, today }: 
                           {customer.nextFollowUp ? (
                             <div className="flex items-center gap-1.5">
                               {overdue && (
-                                <AlertTriangle size={12} className="text-negative shrink-0" />
+                                null
                               )}
                               <span
                                 className={`text-sm font-tabular ${
@@ -568,7 +529,7 @@ export default function CustomerTableClient({ customers, recentVisits, today }: 
                             onClick={() => setSelectedCustomer(customer)}
                             className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors ml-auto"
                           >
-                            <Eye size={14} />
+                            Show
                           </button>
                         </td>
                       </tr>
@@ -612,7 +573,7 @@ export default function CustomerTableClient({ customers, recentVisits, today }: 
                 disabled={page === 1}
                 className="w-7 h-7 rounded-md flex items-center justify-center border border-border text-muted-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
-                <ChevronLeft size={13} />
+                Prev
               </button>
               {Array.from({ length: totalPages }).map((_, i) => (
                 <button
@@ -632,7 +593,7 @@ export default function CustomerTableClient({ customers, recentVisits, today }: 
                 disabled={page === totalPages}
                 className="w-7 h-7 rounded-md flex items-center justify-center border border-border text-muted-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
-                <ChevronRight size={13} />
+                Next
               </button>
               <button
                 onClick={() => setPage(totalPages)}

@@ -2,7 +2,6 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Search } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
 import { useConfig } from '@/context/ConfigContext';
 import { useUser } from '@/context/UserContext';
@@ -83,7 +82,7 @@ export default function OrdersClient({ orders: initialOrders, customers, priceBo
           onClick={() => setShowNew(true)}
           className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90"
         >
-          <Plus size={16} /> New Order
+           New Order
         </button>
       </div>
 
@@ -100,7 +99,7 @@ export default function OrdersClient({ orders: initialOrders, customers, priceBo
           </button>
         ))}
         <div className="relative ml-auto">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}

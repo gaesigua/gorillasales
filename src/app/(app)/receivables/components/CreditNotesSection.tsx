@@ -68,7 +68,14 @@ export default function CreditNotesSection({ invoice, today, onUpdated }: Props)
       {invoice.creditNotes.map((cn) => (
         <div key={cn.id} className="border border-border rounded-lg p-3 text-sm space-y-1">
           <div className="flex justify-between gap-2">
-            <span className="font-mono font-semibold">{cn.creditNoteNumber || 'Requested'}</span>
+            <span>
+              <span className="font-mono font-semibold">{cn.creditNoteNumber || 'Requested'}</span>{' '}
+              {cn.status === 'APPROVED' && (
+                <a href={`/receivables/credit-notes/${cn.id}`} target="_blank" rel="noopener" className="text-xs">
+                  Print
+                </a>
+              )}
+            </span>
             <span className={cn.status === 'APPROVED' ? 'text-positive' : cn.status === 'REJECTED' ? 'text-negative' : 'text-warning'}>
               {CREDIT_NOTE_STATUS_LABELS[cn.status]}
             </span>

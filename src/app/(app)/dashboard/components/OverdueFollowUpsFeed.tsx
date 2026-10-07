@@ -1,7 +1,6 @@
 'use client';
 
 import React from 'react';
-import { AlertTriangle, Clock, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import type { OverdueFollowUp } from '@/lib/types';
 import Badge from '@/components/ui/Badge';
@@ -15,7 +14,7 @@ export default function OverdueFollowUpsFeed({ items, today }: { items: OverdueF
     <div className="bg-card border border-border rounded-xl overflow-hidden h-full flex flex-col">
       <div className="px-5 py-4 border-b border-border flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <AlertTriangle size={16} className="text-negative" />
+          
           <h3 className="text-sm font-semibold text-foreground">
             {canViewAllReps ? 'Overdue Follow-ups' : 'My Overdue Follow-ups'}
           </h3>
@@ -56,14 +55,11 @@ export default function OverdueFollowUpsFeed({ items, today }: { items: OverdueF
                   ) : (
                     <Badge label="Due today" variant="warning" size="sm" dot />
                   )}
-                  <ChevronRight
-                    size={14}
-                    className="text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
-                  />
+                  
                 </div>
               </div>
               <div className="flex items-center gap-1.5 mt-1.5">
-                <Clock size={11} className="text-muted-foreground" />
+                
                 <span className="text-[11px] text-muted-foreground">
                   Due {fu?.dueDate} · {fu?.lastOutcome}
                 </span>

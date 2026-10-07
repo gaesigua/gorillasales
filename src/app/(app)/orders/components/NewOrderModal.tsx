@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X } from 'lucide-react';
 import { useConfig } from '@/context/ConfigContext';
 import { useUser } from '@/context/UserContext';
 import { createOrder } from '@/actions/orders';
@@ -56,7 +55,7 @@ export default function NewOrderModal({ customers, priceBook, today, initialCust
   };
 
   const inputClass =
-    'w-full bg-input border border-border rounded-lg px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring';
+    'w-full bg-input border border-border rounded-lg px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring';
   const labelClass = 'block text-xs font-semibold text-foreground mb-1.5';
 
   return (
@@ -66,7 +65,7 @@ export default function NewOrderModal({ customers, priceBook, today, initialCust
         <div className="sticky top-0 bg-card border-b border-border px-6 py-4 flex items-center justify-between z-10">
           <h2 className="text-lg font-semibold text-foreground">New Order</h2>
           <button onClick={onClose} className="p-1.5 rounded-lg text-muted-foreground hover:bg-muted" aria-label="Close">
-            <X size={18} />
+            Close
           </button>
         </div>
         <div className="px-6 py-5 space-y-5">

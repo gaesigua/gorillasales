@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import { useConfig } from '@/context/ConfigContext';
 import { recordPayment, setEbmReceiptNumber } from '@/actions/payments';
@@ -71,8 +70,11 @@ export default function InvoiceDrawer({ invoice, today, onClose, onUpdated }: In
           </div>
           <div className="flex items-center gap-2">
             <InvoiceStatusBadge status={invoice.status} />
+            <a href={`/receivables/invoices/${invoice.id}`} target="_blank" rel="noopener" className="text-sm">
+              Print
+            </a>
             <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground" aria-label="Close">
-              <X size={18} />
+              Close
             </button>
           </div>
         </div>

@@ -1,9 +1,9 @@
 'use client';
 
 import React from 'react';
-import { TrendingUp, Target, Users, ShoppingBag, AlertTriangle, UserPlus, Layers, Trophy, Activity } from 'lucide-react';
-import { formatRWF } from '@/lib/format';
-import { MONTH_SHORT } from '@/lib/dates';
+import Link from 'next/link';
+import { formatRWFFull } from '@/lib/format';
+import { MONTH_LONG } from '@/lib/dates';
 import { useUser } from '@/context/UserContext';
 import type { DashboardData } from '@/lib/types';
 
@@ -23,171 +23,54 @@ function computeKpis(data: DashboardData) {
   return { totalTarget, totalActual, achievementPct, newCustomers, totalVisits, totalOrders, outstandingFollowUps, pipelinePotential, weightedPipeline, topRep };
 }
 
+/** The month's key figures as a plain label/value table. */
 export default function DashboardKpiGrid({ data }: { data: DashboardData }) {
   const { canViewAllReps } = useUser();
-  const kpis = computeKpis(data);
-  const period = `${MONTH_SHORT[data.month]} ${data.year}`;
+  const k = computeKpis(data);
+  const alert = 'text-negative font-bold';
+
+  const cells: [React.ReactNode, React.ReactNode, boolean?][] = [
+    ['Net sales', <>{formatRWFFull(Math.round(k.totalActual))}</>],
+    ['Target', <>{formatRWFFull(k.totalTarget)}</>],
+    ['Achievement', <>{k.achievementPct.toFixed(1)}%</>, k.totalTarget > 0 && k.achievementPct < 60],
+    ['Visits', <>{k.totalVisits}</>],
+    ['Orders', <>{k.totalOrders} ({k.totalVisits ? Math.round((k.totalOrders / k.totalVisits) * 100) : 0}% of visits)</>],
+    ['New customers', <>{k.newCustomers}</>],
+    [<Link key="f" href="/customer-management">Overdue follow-ups</Link>, <>{k.outstandingFollowUps}</>, k.outstandingFollowUps > 0],
+    ['Weighted pipeline', <>{formatRWFFull(Math.round(k.weightedPipeline))} of {formatRWFFull(Math.round(k.pipelinePotential))}</>],
+    [<Link key="r" href="/receivables">Outstanding receivables</Link>, <>{formatRWFFull(Math.round(data.receivables.total))}</>],
+    [<Link key="o" href="/receivables">Overdue receivables</Link>, <>{formatRWFFull(Math.round(data.receivables.overdue))}</>, data.receivables.overdue > 0],
+    [<Link key="h" href="/orders">Orders on credit hold</Link>, <>{data.ordersOnHold}</>, data.ordersOnHold > 0],
+    [<Link key="d" href="/orders">Orders to deliver</Link>, <>{data.ordersToDeliver}</>],
+  ];
+  if (canViewAllReps && k.topRep) {
+    cells.push(['Top seller', <>{k.topRep.salesperson} ({formatRWFFull(Math.round(k.topRep.actualSales))})</>]);
+  }
+
+  // Lay the pairs out four to a row: label | value | label | value ...
+  const rows: (typeof cells)[] = [];
+  for (let i = 0; i < cells.length; i += 2) rows.push(cells.slice(i, i + 2));
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-4 gap-4">
-      {/* Hero: Actual Sales vs Target — spans 2 cols */}
-      <div className="col-span-1 sm:col-span-2 bg-primary rounded-xl p-5 flex flex-col justify-between min-h-[140px]">
-        <div className="flex items-start justify-between">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-widest text-primary-foreground/50 mb-1">
-              {canViewAllReps ? `Total Actual Sales — ${period}` : `My Actual Sales — ${period}`}
-            </p>
-            <p className="text-hero-metric text-primary-foreground font-tabular">
-              {formatRWF(kpis?.totalActual)}
-            </p>
-            <p className="text-sm text-primary-foreground/60 mt-1 font-tabular">
-              of {formatRWF(kpis?.totalTarget)} target
-            </p>
-          </div>
-          <div className="w-10 h-10 rounded-lg bg-primary-foreground/10 flex items-center justify-center shrink-0">
-            <Activity size={20} className="text-primary-foreground/70" />
-          </div>
-        </div>
-        <div className="mt-4">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-xs text-primary-foreground/60">Achievement</span>
-            <span className="text-sm font-bold text-accent font-tabular">
-              {kpis?.achievementPct?.toFixed(1)}%
-            </span>
-          </div>
-          <div className="w-full bg-primary-foreground/10 rounded-full h-2">
-            <div
-              className="h-2 rounded-full bg-accent health-bar-fill"
-              style={{ width: `${Math.min(kpis?.achievementPct, 100)}%` }}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Outstanding Follow-ups — alert state */}
-      <div className="bg-negative-bg border border-negative/20 rounded-xl p-5 flex flex-col justify-between min-h-[140px]">
-        <div className="flex items-start justify-between">
-          <p className="text-[11px] font-semibold uppercase tracking-widest text-negative/70 mb-1">
-            Overdue Follow-ups
-          </p>
-          <AlertTriangle size={16} className="text-negative shrink-0" />
-        </div>
-        <div>
-          <p className="text-hero-metric text-negative font-tabular">
-            {kpis?.outstandingFollowUps}
-          </p>
-          <p className="text-xs text-negative/60 mt-1">
-            Require action today
-          </p>
-        </div>
-        <div className="mt-2 flex items-center gap-1.5">
-          <TrendingUp size={13} className="text-negative" />
-          <span className="text-[11px] text-negative/70">Follow-up date reached, no newer visit</span>
-        </div>
-      </div>
-
-      {/* Top Salesperson — only for managers/admins */}
-      {canViewAllReps ? (
-        <div className="bg-accent/5 border border-accent/20 rounded-xl p-5 flex flex-col justify-between min-h-[140px]">
-          <div className="flex items-start justify-between">
-            <p className="text-[11px] font-semibold uppercase tracking-widest text-accent/70 mb-1">
-              Top Performer
-            </p>
-            <Trophy size={16} className="text-accent shrink-0" />
-          </div>
-          <div>
-            <p className="text-base font-bold text-foreground leading-tight">
-              {kpis?.topRep?.salesperson?.split(' ')?.[0]}
-            </p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {kpis?.topRep?.salesperson}
-            </p>
-            <p className="text-xl font-bold text-accent font-tabular mt-1">
-              {kpis?.topRep?.achievementPct?.toFixed(1)}%
-            </p>
-          </div>
-          <p className="text-[11px] text-muted-foreground mt-1">
-            {formatRWF(kpis?.topRep?.actualSales ?? 0)} actual
-          </p>
-        </div>
-      ) : (
-        <div className="bg-accent/5 border border-accent/20 rounded-xl p-5 flex flex-col justify-between min-h-[140px]">
-          <div className="flex items-start justify-between">
-            <p className="text-[11px] font-semibold uppercase tracking-widest text-accent/70 mb-1">
-              My Achievement
-            </p>
-            <Target size={16} className="text-accent shrink-0" />
-          </div>
-          <div>
-            <p className="text-xl font-bold text-accent font-tabular mt-1">
-              {kpis?.achievementPct?.toFixed(1)}%
-            </p>
-            <p className="text-xs text-muted-foreground mt-0.5">of monthly target</p>
-          </div>
-          <p className="text-[11px] text-muted-foreground mt-1">
-            {formatRWF(kpis?.totalActual)} actual
-          </p>
-        </div>
-      )}
-
-      {/* Row 2: 4 equal cards */}
-      <div className="bg-card border border-border rounded-xl p-5 flex flex-col justify-between">
-        <div className="flex items-start justify-between mb-2">
-          <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
-            Total Visits
-          </p>
-          <Users size={15} className="text-muted-foreground" />
-        </div>
-        <p className="text-3xl font-bold text-foreground font-tabular">
-          {kpis?.totalVisits}
-        </p>
-        <p className="text-xs text-muted-foreground mt-1">This month</p>
-      </div>
-
-      <div className="bg-card border border-border rounded-xl p-5 flex flex-col justify-between">
-        <div className="flex items-start justify-between mb-2">
-          <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
-            Orders Placed
-          </p>
-          <ShoppingBag size={15} className="text-muted-foreground" />
-        </div>
-        <p className="text-3xl font-bold text-foreground font-tabular">
-          {kpis?.totalOrders}
-        </p>
-        <div className="flex items-center gap-1 mt-1">
-          <span className="text-xs text-positive font-medium">
-            {kpis?.totalVisits > 0 ? ((kpis?.totalOrders / kpis?.totalVisits) * 100)?.toFixed(0) : 0}% conversion
-          </span>
-        </div>
-      </div>
-
-      <div className="bg-card border border-border rounded-xl p-5 flex flex-col justify-between">
-        <div className="flex items-start justify-between mb-2">
-          <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
-            New Customers
-          </p>
-          <UserPlus size={15} className="text-muted-foreground" />
-        </div>
-        <p className="text-3xl font-bold text-foreground font-tabular">
-          {kpis?.newCustomers}
-        </p>
-        <p className="text-xs text-muted-foreground mt-1">Acquired this month</p>
-      </div>
-
-      <div className="bg-card border border-border rounded-xl p-5 flex flex-col justify-between">
-        <div className="flex items-start justify-between mb-2">
-          <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
-            Weighted Pipeline
-          </p>
-          <Layers size={15} className="text-muted-foreground" />
-        </div>
-        <p className="text-2xl font-bold text-foreground font-tabular">
-          {formatRWF(kpis?.weightedPipeline ?? 0)}
-        </p>
-        <p className="text-xs text-muted-foreground mt-1">
-          {formatRWF(kpis?.pipelinePotential ?? 0)} potential
-        </p>
-      </div>
-    </div>
+    <table className="w-full text-sm">
+      <caption className="text-left font-bold pb-1">
+        {MONTH_LONG[data.month]} {data.year} at a glance
+      </caption>
+      <tbody>
+        {rows.map((pair, i) => (
+          <tr key={i}>
+            {pair.map(([label, value, isAlert], j) => (
+              <React.Fragment key={j}>
+                <th scope="row" className="text-left font-normal bg-muted w-1/5 px-2 py-1">
+                  {label}
+                </th>
+                <td className={`px-2 py-1 font-tabular ${isAlert ? alert : ''}`}>{value}</td>
+              </React.Fragment>
+            ))}
+            {pair.length === 1 && <td colSpan={2} />}
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }

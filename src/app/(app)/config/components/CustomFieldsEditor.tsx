@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { getCustomFieldDefinitions, createCustomFieldDefinition, CustomFieldDefinitionDTO } from '@/actions/customFields';
-import { Plus, Sliders, CheckCircle, Sparkles, Layers, Type, Hash, Calendar, List, CheckSquare } from 'lucide-react';
 import Badge from '@/components/ui/Badge';
 
 type EntityType = 'CUSTOMER' | 'VISIT_LOG' | 'DEAL' | 'PRODUCT';
@@ -75,22 +74,22 @@ export default function CustomFieldsEditor() {
 
   const getFieldTypeIcon = (type: string) => {
     switch (type) {
-      case 'NUMBER': return <Hash size={14} className="text-info" />;
-      case 'DATE': return <Calendar size={14} className="text-warning" />;
+      case 'NUMBER': return null;
+      case 'DATE': return null;
       case 'SELECT':
-      case 'MULTI_SELECT': return <List size={14} className="text-accent" />;
-      case 'BOOLEAN': return <CheckSquare size={14} className="text-positive" />;
-      default: return <Type size={14} className="text-primary" />;
+      case 'MULTI_SELECT': return null;
+      case 'BOOLEAN': return null;
+      default: return null;
     }
   };
 
   return (
     <div className="space-y-6">
       {/* Header Banner */}
-      <div className="bg-gradient-to-r from-accent/10 via-primary/5 to-transparent border border-accent/20 rounded-2xl p-5 flex items-start justify-between gap-4 flex-wrap">
+      <div className="bg-muted border border-accent/20 rounded-2xl p-5 flex items-start justify-between gap-4 flex-wrap">
         <div>
           <div className="flex items-center gap-2">
-            <Sparkles size={18} className="text-accent animate-pulse" />
+            
             <h2 className="text-base font-bold text-foreground">Twenty CRM Dynamic Custom Fields Engine</h2>
           </div>
           <p className="text-xs text-muted-foreground mt-1 max-w-2xl">
@@ -101,14 +100,14 @@ export default function CustomFieldsEditor() {
           onClick={() => setShowModal(true)}
           className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-accent text-white text-xs font-semibold hover:bg-accent/90 transition-all shadow-sm"
         >
-          <Plus size={15} />
+          
           Create Custom Field
         </button>
       </div>
 
       {message && (
         <div className="p-3 bg-positive/10 border border-positive/20 text-positive rounded-xl text-xs font-medium flex items-center gap-2">
-          <CheckCircle size={15} />
+          
           {message}
         </div>
       )}
@@ -129,7 +128,7 @@ export default function CustomFieldsEditor() {
               <span className={`text-xs font-bold ${selectedEntity === ent.id ? 'text-accent' : 'text-foreground'}`}>
                 {ent.label}
               </span>
-              <Layers size={14} className={selectedEntity === ent.id ? 'text-accent' : 'text-muted-foreground'} />
+              
             </div>
             <p className="text-[11px] text-muted-foreground line-clamp-2">{ent.description}</p>
           </button>
@@ -152,9 +151,6 @@ export default function CustomFieldsEditor() {
           <div className="p-8 text-center text-xs text-muted-foreground">Loading custom fields...</div>
         ) : fields.length === 0 ? (
           <div className="p-10 text-center space-y-3">
-            <div className="w-10 h-10 rounded-full bg-muted/60 flex items-center justify-center mx-auto text-muted-foreground">
-              <Sliders size={20} />
-            </div>
             <div>
               <p className="text-sm font-semibold text-foreground">No Custom Fields Yet</p>
               <p className="text-xs text-muted-foreground max-w-sm mx-auto mt-1">
@@ -165,7 +161,7 @@ export default function CustomFieldsEditor() {
               onClick={() => setShowModal(true)}
               className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-accent text-white text-xs font-medium hover:bg-accent/90"
             >
-              <Plus size={14} />
+              
               Add First Field
             </button>
           </div>
@@ -206,7 +202,7 @@ export default function CustomFieldsEditor() {
 
       {/* Create Field Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
           <div className="bg-card border border-border rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-5">
             <div className="flex items-center justify-between border-b border-border pb-3">
               <div>

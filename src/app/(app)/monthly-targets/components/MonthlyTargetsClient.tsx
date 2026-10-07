@@ -2,7 +2,6 @@
 
 import React, { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { Target, AlertCircle, ChevronDown, Users, CheckCircle2, XCircle, Clock, Download, FileText } from 'lucide-react';
 import { formatRWF } from '@/lib/format';
 import { MONTH_LONG as MONTHS } from '@/lib/dates';
 import { needsFollowUp } from '@/lib/visitRules';
@@ -82,18 +81,18 @@ function buildMonthlyPerf(
 
 function AchievementBadge({ pct }: { pct: number }) {
   if (pct >= 100) return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-green-50 text-green-700">
-      <CheckCircle2 size={11} /> {pct}%
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-positive-bg text-positive">
+       {pct}%
     </span>
   );
   if (pct >= 75) return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-amber-50 text-amber-700">
-      <Clock size={11} /> {pct}%
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-warning-bg text-warning">
+       {pct}%
     </span>
   );
   return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-red-50 text-red-700">
-      <XCircle size={11} /> {pct}%
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-negative-bg text-negative">
+       {pct}%
     </span>
   );
 }
@@ -241,7 +240,7 @@ export default function MonthlyTargetsClient({ month, year, years, reps, visits,
                 <option key={m} value={i}>{m}</option>
               ))}
             </select>
-            <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+            
           </div>
           <div className="relative">
             <select
@@ -253,7 +252,7 @@ export default function MonthlyTargetsClient({ month, year, years, reps, visits,
                 <option key={y} value={y}>{y}</option>
               ))}
             </select>
-            <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+            
           </div>
           {/* Download buttons */}
           <button
@@ -261,7 +260,7 @@ export default function MonthlyTargetsClient({ month, year, years, reps, visits,
             className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border bg-card text-foreground text-sm font-medium hover:bg-muted transition-colors"
             title="Download CSV"
           >
-            <Download size={14} />
+            
             <span className="hidden sm:inline">CSV</span>
           </button>
           <button
@@ -269,7 +268,7 @@ export default function MonthlyTargetsClient({ month, year, years, reps, visits,
             className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border bg-card text-foreground text-sm font-medium hover:bg-muted transition-colors"
             title="Download PDF"
           >
-            <FileText size={14} />
+            
             <span className="hidden sm:inline">PDF</span>
           </button>
         </div>
@@ -277,7 +276,7 @@ export default function MonthlyTargetsClient({ month, year, years, reps, visits,
 
       {exportMsg && (
         <div className="flex items-center gap-2 bg-positive/10 border border-positive/30 text-positive text-sm px-4 py-3 rounded-lg">
-          <CheckCircle2 size={15} />
+          
           {exportMsg}
         </div>
       )}
@@ -303,20 +302,20 @@ export default function MonthlyTargetsClient({ month, year, years, reps, visits,
           <div className="bg-card border border-border rounded-xl p-4">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Achievement</p>
             <div className="flex items-baseline gap-2">
-              <p className={`text-xl font-bold font-tabular ${teamAchievement >= 100 ? 'text-green-600' : teamAchievement >= 75 ? 'text-amber-600' : 'text-red-600'}`}>
+              <p className={`text-xl font-bold font-tabular ${teamAchievement >= 100 ? 'text-positive' : teamAchievement >= 75 ? 'text-warning' : 'text-negative'}`}>
                 {teamAchievement}%
               </p>
               <span className="text-xs text-muted-foreground">RWF</span>
             </div>
             <div className="flex items-center gap-1 mt-0.5">
-              <span className={`text-xs font-semibold ${teamAchievementKg >= 100 ? 'text-green-600' : teamAchievementKg >= 75 ? 'text-amber-600' : 'text-red-600'}`}>
+              <span className={`text-xs font-semibold ${teamAchievementKg >= 100 ? 'text-positive' : teamAchievementKg >= 75 ? 'text-warning' : 'text-negative'}`}>
                 {teamAchievementKg}%
               </span>
               <span className="text-xs text-muted-foreground">KG</span>
             </div>
             <div className="w-full bg-muted rounded-full h-1.5 mt-1.5">
               <div
-                className={`h-1.5 rounded-full health-bar-fill ${teamAchievement >= 100 ? 'bg-green-500' : teamAchievement >= 75 ? 'bg-amber-500' : 'bg-red-500'}`}
+                className={`h-1.5 rounded-full health-bar-fill ${teamAchievement >= 100 ? 'bg-positive' : teamAchievement >= 75 ? 'bg-warning' : 'bg-negative'}`}
                 style={{ width: `${Math.min(teamAchievement, 100)}%` }}
               />
             </div>
@@ -327,7 +326,7 @@ export default function MonthlyTargetsClient({ month, year, years, reps, visits,
       {/* Performance Table */}
       <div className="bg-card border border-border rounded-xl overflow-hidden">
         <div className="px-5 py-4 border-b border-border flex items-center gap-2">
-          <Users size={16} className="text-accent" />
+          
           <h2 className="text-sm font-semibold text-foreground">
             Officer Performance — {MONTHS[selectedMonth]} {selectedYear}
           </h2>
@@ -363,8 +362,8 @@ export default function MonthlyTargetsClient({ month, year, years, reps, visits,
                 const gapKg = rep.targetKg - rep.actualKg;
                 const barPct = Math.min(rep.achievementPct, 100);
                 const barColor =
-                  rep.achievementPct >= 100 ? 'bg-green-500' :
-                  rep.achievementPct >= 75  ? 'bg-amber-500' : 'bg-red-500';
+                  rep.achievementPct >= 100 ? 'bg-positive' :
+                  rep.achievementPct >= 75  ? 'bg-warning' : 'bg-negative';
 
                 return (
                   <tr
@@ -375,9 +374,6 @@ export default function MonthlyTargetsClient({ month, year, years, reps, visits,
                   >
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-full bg-accent/20 flex items-center justify-center text-[10px] font-bold text-accent shrink-0">
-                          {rep.name.split(' ').map((n) => n[0]).join('')}
-                        </div>
                         <div>
                           <p className="font-semibold text-foreground text-sm">{rep.name}</p>
                           {gapRwf > 0 ? (
@@ -385,7 +381,7 @@ export default function MonthlyTargetsClient({ month, year, years, reps, visits,
                               Gap: <span className="text-negative font-semibold">{formatRWF(gapRwf)}</span>
                             </p>
                           ) : (
-                            <p className="text-[11px] text-green-600 font-semibold">RWF target exceeded ✓</p>
+                            <p className="text-[11px] text-positive font-semibold">RWF target exceeded ✓</p>
                           )}
                         </div>
                       </div>
@@ -416,12 +412,12 @@ export default function MonthlyTargetsClient({ month, year, years, reps, visits,
                     </td>
                     <td className="px-4 py-3 text-right">
                       {rep.outstandingFollowUps > 0 ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-red-50 text-red-700">
-                          <AlertCircle size={10} />
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-negative-bg text-negative">
+                          
                           {rep.outstandingFollowUps}
                         </span>
                       ) : (
-                        <span className="text-xs text-green-600 font-semibold">—</span>
+                        <span className="text-xs text-positive font-semibold">—</span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-right font-tabular font-semibold text-foreground">
@@ -463,12 +459,12 @@ export default function MonthlyTargetsClient({ month, year, years, reps, visits,
                   </td>
                   <td className="px-4 py-3 text-right">
                     {teamFollowUps > 0 ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-red-50 text-red-700">
-                        <AlertCircle size={10} />
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-negative-bg text-negative">
+                        
                         {teamFollowUps}
                       </span>
                     ) : (
-                      <span className="text-xs text-green-600 font-semibold">—</span>
+                      <span className="text-xs text-positive font-semibold">—</span>
                     )}
                   </td>
                   <td className="px-4 py-3 text-right font-tabular font-bold text-foreground">
@@ -483,9 +479,9 @@ export default function MonthlyTargetsClient({ month, year, years, reps, visits,
 
       {/* Legend note */}
       <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
-        <span className="flex items-center gap-1.5"><CheckCircle2 size={12} className="text-green-600" /> ≥ 100% — Target met</span>
-        <span className="flex items-center gap-1.5"><Clock size={12} className="text-amber-600" /> 75–99% — On track</span>
-        <span className="flex items-center gap-1.5"><XCircle size={12} className="text-red-600" /> &lt; 75% — Below target</span>
+        <span className="flex items-center gap-1.5"> ≥ 100% — Target met</span>
+        <span className="flex items-center gap-1.5"> 75–99% — On track</span>
+        <span className="flex items-center gap-1.5"> &lt; 75% — Below target</span>
         <span className="ml-auto italic hidden sm:inline">Data auto-aggregated from daily sales entries</span>
       </div>
     </div>

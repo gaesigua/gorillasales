@@ -2,9 +2,7 @@
 
 import React, { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import AppLogo from '@/components/ui/AppLogo';
 import { loginAction } from '@/actions/auth';
-import { LogIn, Lock } from 'lucide-react';
 
 function LoginForm() {
   const router = useRouter();
@@ -36,86 +34,81 @@ function LoginForm() {
   };
 
   return (
-    <div className="bg-white border border-slate-200 rounded-md p-7 shadow-sm space-y-6">
-      {/* Header */}
-      <div className="text-center space-y-2">
-        <div className="inline-flex items-center justify-center w-12 h-12 rounded bg-yellow-500/10 border border-yellow-500/30 mb-1">
-          <AppLogo size={32} />
-        </div>
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900">GorillaSales Enterprise</h1>
-        <p className="text-xs text-slate-500">
-          Multi-Tenant Coffee Distribution CRM & SFA Platform
-        </p>
-      </div>
+    <form onSubmit={handleSubmit}>
+      <fieldset className="border border-border bg-card p-4">
+        <legend className="px-1 font-bold">Sign in</legend>
 
-      {error && (
-        <div className="p-3 rounded bg-red-50 border border-red-200 text-red-700 text-xs font-medium text-center">
-          {error}
-        </div>
-      )}
+        {error && <p className="mb-3 border border-negative bg-negative-bg px-2 py-1 text-sm text-negative">{error}</p>}
 
-      {/* Form */}
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-            Work Email Address
-          </label>
-          <input
-            type="email"
-            required
-            placeholder="eric.m@gorillacoffee.rw"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full px-3.5 py-2.5 rounded bg-slate-50 border border-slate-300 text-slate-900 placeholder:text-slate-400 text-sm focus:outline-none focus:border-yellow-500 focus:ring-1 focus:ring-yellow-500 transition-colors"
-          />
-        </div>
-
-        <div>
-          <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-            Password
-          </label>
-          <div className="relative">
-            <input
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded bg-slate-50 border border-slate-300 text-slate-900 placeholder:text-slate-400 text-sm focus:outline-none focus:border-yellow-500 focus:ring-1 focus:ring-yellow-500 transition-colors"
-            />
-            <Lock size={15} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-          </div>
-        </div>
-
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full py-2.5 px-4 rounded bg-yellow-500 hover:bg-yellow-400 text-slate-950 text-sm font-bold flex items-center justify-center gap-2 transition-colors active:scale-[0.99] disabled:opacity-50 shadow-sm"
-        >
-          {loading ? (
-            'Authenticating...'
-          ) : (
-            <>
-              <LogIn size={16} />
-              Sign In to Workspace
-            </>
-          )}
-        </button>
-      </form>
-    </div>
+        <table className="w-full border-0 [&_td]:border-0 [&_tr]:bg-transparent">
+          <tbody>
+            <tr>
+              <td className="w-24 py-1 pr-2 text-sm">
+                <label htmlFor="email">Email:</label>
+              </td>
+              <td className="py-1">
+                <input
+                  id="email"
+                  type="email"
+                  required
+                  autoComplete="username"
+                  autoFocus
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full px-1.5 py-1 text-sm"
+                />
+              </td>
+            </tr>
+            <tr>
+              <td className="py-1 pr-2 text-sm">
+                <label htmlFor="password">Password:</label>
+              </td>
+              <td className="py-1">
+                <input
+                  id="password"
+                  type="password"
+                  required
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full px-1.5 py-1 text-sm"
+                />
+              </td>
+            </tr>
+            <tr>
+              <td />
+              <td className="pt-2">
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="border border-brand bg-brand px-4 py-1 text-sm font-bold text-white disabled:opacity-60"
+                >
+                  {loading ? 'Signing in...' : 'Sign in'}
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </fieldset>
+    </form>
   );
 }
 
 export default function LoginPage() {
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        <Suspense fallback={<div className="p-8 bg-white border border-slate-200 rounded-md text-center text-slate-600 text-sm">Loading workspace auth...</div>}>
+    <div className="min-h-screen bg-background">
+      <div className="bg-brand px-4 py-2 text-white">
+        <a href="/" className="text-lg font-bold text-white no-underline">
+          GorillaSales
+        </a>
+        <span className="ml-3 text-sm">Sales &amp; distribution system</span>
+      </div>
+      <div className="mx-auto max-w-sm px-4 pt-12">
+        <Suspense fallback={<p className="text-sm">Loading...</p>}>
           <LoginForm />
         </Suspense>
-
-        {/* Footer info */}
-        <p className="text-center text-[11px] text-slate-500 mt-4">
-          GorillaSales Enterprise CRM · Protected by JWT HTTP-Only Cookie Session Guards
+        <p className="mt-3 text-xs text-muted-foreground">
+          Forgotten your password? Ask your manager or administrator to reset it in Users.
         </p>
       </div>
     </div>

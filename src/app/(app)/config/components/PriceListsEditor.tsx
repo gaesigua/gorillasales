@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
 import { deletePriceList, savePriceList } from '@/actions/config';
 import type { ActionResult, PriceListDTO, ProductItem } from '@/lib/types';
 
@@ -59,7 +58,7 @@ export default function PriceListsEditor({ priceLists, products, onSaved }: Pric
 
   if (draft) {
     return (
-      <div className="bg-card border border-border rounded-xl p-5 space-y-4">
+      <div className="bg-card border border-border p-3 space-y-4">
         <h3 className="font-semibold text-sm">{draft.id ? `Edit ${draft.name}` : 'New price list'}</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <input className={inputClass} placeholder="Name, e.g. Hotels & HoReCa" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
@@ -117,7 +116,7 @@ export default function PriceListsEditor({ priceLists, products, onSaved }: Pric
           </p>
         </div>
         <button onClick={() => setDraft(toDraft())} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent text-white text-xs font-semibold shrink-0">
-          <Plus size={13} /> New price list
+           New price list
         </button>
       </div>
       {error && <p className="px-5 pt-3 text-sm text-negative">{error}</p>}
@@ -141,14 +140,14 @@ export default function PriceListsEditor({ priceLists, products, onSaved }: Pric
           )}
           {priceLists.map((l) => (
             <tr key={l.id}>
-              <td className="px-5 py-2.5 font-medium">{l.name}</td>
-              <td className="px-5 py-2.5 text-muted-foreground">{l.description || '—'}</td>
-              <td className="px-5 py-2.5 text-right">{l.items.length}</td>
-              <td className="px-5 py-2.5 text-right">{l.customerCount}</td>
-              <td className="px-5 py-2.5">
+              <td className="px-5 py-1.5 font-medium">{l.name}</td>
+              <td className="px-5 py-1.5 text-muted-foreground">{l.description || '—'}</td>
+              <td className="px-5 py-1.5 text-right">{l.items.length}</td>
+              <td className="px-5 py-1.5 text-right">{l.customerCount}</td>
+              <td className="px-5 py-1.5">
                 <div className="flex justify-end gap-1">
                   <button onClick={() => setDraft(toDraft(l))} className="p-1.5 rounded-lg text-muted-foreground hover:text-accent" title="Edit">
-                    <Pencil size={13} />
+                    Edit
                   </button>
                   <button
                     disabled={busy}
@@ -160,7 +159,7 @@ export default function PriceListsEditor({ priceLists, products, onSaved }: Pric
                     className="p-1.5 rounded-lg text-muted-foreground hover:text-negative"
                     title="Remove"
                   >
-                    <Trash2 size={13} />
+                    Delete
                   </button>
                 </div>
               </td>

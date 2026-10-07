@@ -2,33 +2,47 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * GorillaSales design system — "classic business web".
+ * Black text on white, one coffee-brown brand colour, classic blue underlined links,
+ * grey 1px borders, square corners, no shadows, gradients, blur or animation.
+ * Red/green/amber only where they carry meaning (overdue, paid, warnings).
+ */
 :root {
-  --background: #f7f5f2;
-  --foreground: #1a1a18;
-  --primary: #f7b31d;
-  --primary-foreground: #ffffff;
-  --secondary: #e8e4de;
-  --secondary-foreground: #f7b31d;
-  --accent: #f7b31d;
-  --accent-foreground: #ffffff;
-  --muted: #ede9e3;
-  --muted-foreground: #6b6560;
-  --card: #ffffff;
-  --card-foreground: #1a1a18;
-  --border: #ddd8d0;
-  --input: #ede9e3;
-  --ring: #c8860a;
-  --radius: 10px;
-  --font-sans: var(--font-roboto), sans-serif;
+  --brand: #4a2c17; /* coffee brown: header bar, primary buttons */
+  --brand-light: #efe6dc; /* tab bar, selected rows */
+  --link: #0645ad;
+  --link-visited: #0b0080;
 
-  --positive: #f7b31d;
-  --positive-bg: #fefce8;
-  --negative: #991b1b;
-  --negative-bg: #fef2f2;
-  --warning: #92400e;
-  --warning-bg: #fffbeb;
-  --info: #1e40af;
-  --info-bg: #eff6ff;
+  --background: #ffffff;
+  --foreground: #000000;
+  --primary: var(--brand);
+  --primary-foreground: #ffffff;
+  --secondary: #eeeeee;
+  --secondary-foreground: #000000;
+  --accent: var(--brand);
+  --accent-foreground: #ffffff;
+  --muted: #f0f0f0;
+  --muted-foreground: #555555;
+  --card: #ffffff;
+  --card-foreground: #000000;
+  --border: #b8b8b8;
+  --input: #ffffff;
+  --ring: var(--brand);
+  --radius: 0px;
+  --font-sans: Verdana, Tahoma, Geneva, 'DejaVu Sans', sans-serif;
+
+  --positive: #1e6b2f;
+  --positive-bg: #e7f3e9;
+  --negative: #b00020;
+  --negative-bg: #fbeaec;
+  --warning: #8a5300;
+  --warning-bg: #fdf3e1;
+  --info: #0645ad;
+  --info-bg: #eaf0fb;
+
+  --table-head: #e4e0da;
+  --table-stripe: #f7f6f4;
 }
 
 @layer base {
@@ -37,19 +51,118 @@
     border-color: var(--border);
   }
 
+  /* 14px root makes all rem-based spacing ~12% denser */
+  html {
+    font-size: 14px;
+  }
+
   body {
     background-color: var(--background);
     color: var(--foreground);
     font-family: var(--font-sans);
-    -webkit-font-smoothing: antialiased;
+    font-size: 13px;
+    line-height: 1.45;
   }
 
-  html {
-    scroll-behavior: smooth;
-  }
-
-  h1, h2, h3, h4, h5, h6, p {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  p {
     margin: 0;
+  }
+
+  h1 {
+    font-weight: bold;
+  }
+
+  /* Classic links: blue and underlined. Links styled as buttons (with a background) are not underlined. */
+  a {
+    color: var(--link);
+    text-decoration: underline;
+  }
+  a[class*='bg-'] {
+    text-decoration: none;
+  }
+  a:hover {
+    color: #b00020;
+  }
+  a[class*='bg-']:hover {
+    color: inherit;
+  }
+
+  /* Dense, gridded data tables with grey headers and striped rows */
+  table {
+    border-collapse: collapse;
+  }
+  th,
+  td {
+    border: 1px solid var(--border);
+  }
+  thead th,
+  thead td {
+    background: var(--table-head);
+    color: #000;
+    font-weight: bold;
+    text-transform: none;
+    letter-spacing: normal;
+  }
+  tbody tr:nth-child(even) {
+    background: var(--table-stripe);
+  }
+
+  /* Plain form controls */
+  input:not([type='checkbox']):not([type='radio']),
+  select,
+  textarea {
+    background: #fff;
+    border: 1px solid #8f8f8f;
+    color: #000;
+    font-family: inherit;
+    font-size: 13px;
+  }
+  input:focus,
+  select:focus,
+  textarea:focus,
+  button:focus-visible,
+  a:focus-visible {
+    outline: 2px solid var(--brand);
+    outline-offset: 0;
+    box-shadow: none;
+  }
+  input:disabled,
+  select:disabled,
+  textarea:disabled {
+    background: #eeeeee;
+    color: #555;
+  }
+
+  /* Secondary buttons (bordered, no background) get the classic light-grey face */
+  button[class*='border']:not([class*='bg-']) {
+    background: #efefef;
+  }
+  button:not(:disabled):hover {
+    filter: brightness(0.95);
+  }
+  button:disabled {
+    cursor: not-allowed;
+  }
+
+  fieldset {
+    border: 1px solid var(--border);
+  }
+  legend {
+    font-weight: bold;
+  }
+
+  /* No motion anywhere except loading spinners */
+  *:not(.animate-spin),
+  *::before,
+  *::after {
+    transition: none !important;
+    animation: none !important;
   }
 }
 
@@ -59,63 +172,72 @@
   }
 
   .text-hero-metric {
-    font-size: clamp(1.75rem, 3vw, 2.25rem);
-    font-weight: 700;
+    font-size: 22px;
+    font-weight: bold;
     line-height: 1.1;
   }
 
-  .sidebar-transition {
-    transition: width 300ms ease, min-width 300ms ease;
-  }
-
-  .fade-in {
-    animation: fadeIn 200ms ease forwards;
-  }
-
-  .slide-in-right {
-    animation: slideInRight 220ms ease forwards;
-  }
-
-  .row-exit {
-    animation: rowExit 250ms ease forwards;
-  }
-
-  @keyframes fadeIn {
-    from { opacity: 0; transform: scale(0.97); }
-    to { opacity: 1; transform: scale(1); }
-  }
-
-  @keyframes slideInRight {
-    from { opacity: 0; transform: translateX(24px); }
-    to { opacity: 1; transform: translateX(0); }
-  }
-
-  @keyframes rowExit {
-    from { opacity: 1; max-height: 60px; }
-    to { opacity: 0; max-height: 0; padding-top: 0; padding-bottom: 0; }
-  }
-
-  .health-bar-fill {
-    transition: width 600ms cubic-bezier(0.4, 0, 0.2, 1);
-  }
-
+  /* Kept so existing class names stay valid; motion is disabled globally */
   .skeleton-pulse {
-    background: linear-gradient(90deg, var(--muted) 25%, var(--secondary) 50%, var(--muted) 75%);
-    background-size: 200% 100%;
-    animation: shimmer 1.5s infinite;
+    background: var(--muted);
   }
+}
 
-  @keyframes shimmer {
-    0% { background-position: 200% 0; }
-    100% { background-position: -200% 0; }
+/* Phones: 16px form text stops iOS zooming in on focus, and taps get a usable height */
+@media (max-width: 640px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
   }
+  button,
+  select,
+  input:not([type='checkbox']):not([type='radio']) {
+    min-height: 36px;
+  }
+}
 
-  .numeric-highlight {
-    animation: numHighlight 800ms ease;
+/* Printing: only the document content, black on white, no navigation or buttons */
+@media print {
+  .no-print,
+  header,
+  nav,
+  button {
+    display: none !important;
   }
+  body {
+    font-size: 11px;
+  }
+  main {
+    overflow: visible !important;
+  }
+  a {
+    color: #000;
+    text-decoration: none;
+  }
+  table {
+    page-break-inside: auto;
+  }
+  tr {
+    page-break-inside: avoid;
+  }
+  .print-only {
+    display: block !important;
+  }
+  @page {
+    margin: 12mm;
+  }
+}
 
-  @keyframes numHighlight {
-    0% { background-color: #fef9c3; }
-    100% { background-color: transparent; }
-  }
+.print-only {
+  display: none;
+}
+
+/* Toast messages (sonner): square, flat, bordered */
+[data-sonner-toaster] [data-sonner-toast] {
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  border: 1px solid #000 !important;
+  font-family: inherit !important;
+  font-size: 12px !important;
 }

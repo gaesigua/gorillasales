@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import SalesEntryForm from './SalesEntryForm';
 import RecentEntriesTable from './RecentEntriesTable';
-import { ClipboardList, TrendingUp, ChevronDown } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import { useConfig } from '@/context/ConfigContext';
 import { deleteVisitLog } from '@/actions/visits';
@@ -78,7 +77,7 @@ export default function DailySalesEntryClient({ visits, customers, priceBook, ro
                   </option>
                 ))}
               </select>
-              <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+              
             </div>
           </div>
         )}
@@ -122,19 +121,13 @@ export default function DailySalesEntryClient({ visits, customers, priceBook, ro
 
       {/* Today's summary strip */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-card border border-border rounded-xl px-5 py-4 flex items-center gap-4">
-          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-            <ClipboardList size={18} className="text-primary" />
-          </div>
+        <div className="bg-card border border-border px-3 py-2 flex items-center gap-4">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Visits Today</p>
             <p className="text-2xl font-bold text-foreground font-tabular">{todayEntries.length}</p>
           </div>
         </div>
-        <div className="bg-card border border-border rounded-xl px-5 py-4 flex items-center gap-4">
-          <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center shrink-0">
-            <TrendingUp size={18} className="text-accent" />
-          </div>
+        <div className="bg-card border border-border px-3 py-2 flex items-center gap-4">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Sales Today</p>
             <p className="text-2xl font-bold text-foreground font-tabular">
@@ -144,10 +137,7 @@ export default function DailySalesEntryClient({ visits, customers, priceBook, ro
             </p>
           </div>
         </div>
-        <div className="bg-card border border-border rounded-xl px-5 py-4 flex items-center gap-4">
-          <div className="w-10 h-10 rounded-lg bg-positive/10 flex items-center justify-center shrink-0">
-            <ClipboardList size={18} className="text-positive" />
-          </div>
+        <div className="bg-card border border-border px-3 py-2 flex items-center gap-4">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Orders Today</p>
             <p className="text-2xl font-bold text-foreground font-tabular">{todayOrders}</p>

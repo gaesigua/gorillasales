@@ -31,7 +31,7 @@ function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
   if (!active || !payload || !payload.length) return null;
   const d = payload[0].payload;
   return (
-    <div className="bg-card border border-border rounded-lg shadow-lg px-4 py-3">
+    <div className="bg-card border border-foreground px-2 py-1">
       <p className="text-xs font-semibold text-muted-foreground mb-2">{label}</p>
       <div className="flex items-center justify-between gap-6 mb-1">
         <span className="text-xs text-muted-foreground">Actual</span>
@@ -68,13 +68,14 @@ export default function RepPerformanceChart({ rows }: { rows: RepPerformanceRow[
   }));
 
   return (
+    <>
     <ResponsiveContainer width="100%" height={220}>
       <BarChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }} barSize={28}>
-        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+        <CartesianGrid stroke="#e4e4e4" vertical={false} />
         <XAxis
           dataKey="name"
-          tick={{ fill: 'var(--muted-foreground)', fontSize: 12 }}
-          axisLine={false}
+          tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }}
+          axisLine={{ stroke: 'var(--border)' }}
           tickLine={false}
         />
         <YAxis
@@ -85,15 +86,15 @@ export default function RepPerformanceChart({ rows }: { rows: RepPerformanceRow[
           domain={[0, 110]}
           width={40}
         />
-        <Tooltip content={<CustomTooltip />} cursor={{ fill: 'var(--muted)', opacity: 0.5 }} />
+        <Tooltip content={<CustomTooltip />} cursor={{ fill: 'var(--muted)' }} isAnimationActive={false} />
         <ReferenceLine
           y={80}
           stroke="var(--positive)"
           strokeDasharray="4 3"
           strokeWidth={1.5}
-          label={{ value: '80% target', position: 'insideTopRight', fill: 'var(--positive)', fontSize: 10 }}
+          label={{ value: '80% target', position: 'insideTopRight', fill: 'var(--foreground)', fontSize: 10 }}
         />
-        <Bar dataKey="achievement" radius={[4, 4, 0, 0]}>
+        <Bar dataKey="achievement" isAnimationActive={false}>
           {chartData.map((entry, index) => (
             <Cell
               key={`cell-rep-${index}`}
@@ -101,14 +102,26 @@ export default function RepPerformanceChart({ rows }: { rows: RepPerformanceRow[
                 entry.achievement >= 80
                   ? 'var(--positive)'
                   : entry.achievement >= 60
-                  ? 'var(--accent)'
+                  ? 'var(--warning)'
                   : 'var(--negative)'
               }
-              fillOpacity={0.85}
             />
           ))}
         </Bar>
       </BarChart>
     </ResponsiveContainer>
+    <p className="flex flex-wrap gap-4 text-xs mt-1">
+      {[
+        ['var(--positive)', 'On track (80%+)'],
+        ['var(--warning)', 'At risk (60–79%)'],
+        ['var(--negative)', 'Behind (under 60%)'],
+      ].map(([color, label]) => (
+        <span key={label} className="flex items-center gap-1">
+          <span className="inline-block w-2.5 h-2.5" style={{ backgroundColor: color }} />
+          {label}
+        </span>
+      ))}
+    </p>
+    </>
   );
 }

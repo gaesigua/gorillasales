@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { X, Download, FileText, Table, FileSpreadsheet } from 'lucide-react';
 import { formatRWF } from '@/lib/format';
 import { ORDER_STATUS_LABELS, type VisitLog } from '@/lib/types';
 
@@ -47,9 +46,9 @@ const WEEK_OPTIONS = [
 ];
 
 const FORMAT_OPTIONS: { value: ExportFormat; label: string; icon: React.ReactNode; ext: string }[] = [
-  { value: 'pdf', label: 'PDF', icon: <FileText size={18} />, ext: '.pdf' },
-  { value: 'excel', label: 'Excel', icon: <FileSpreadsheet size={18} />, ext: '.xlsx' },
-  { value: 'word', label: 'Word', icon: <Table size={18} />, ext: '.docx' },
+  { value: 'pdf', label: 'PDF', icon: null, ext: '.pdf' },
+  { value: 'excel', label: 'Excel', icon: null, ext: '.xlsx' },
+  { value: 'word', label: 'Word', icon: null, ext: '.docx' },
 ];
 
 export default function WeeklyReportExport({ visits, today, onClose }: WeeklyReportExportProps) {
@@ -300,7 +299,7 @@ export default function WeeklyReportExport({ visits, today, onClose }: WeeklyRep
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-lg">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
@@ -312,7 +311,7 @@ export default function WeeklyReportExport({ visits, today, onClose }: WeeklyRep
             onClick={onClose}
             className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
           >
-            <X size={18} />
+            Close
           </button>
         </div>
 
@@ -324,7 +323,7 @@ export default function WeeklyReportExport({ visits, today, onClose }: WeeklyRep
             <select
               value={selectedSalesperson}
               onChange={(e) => setSelectedSalesperson(e.target.value)}
-              className="w-full bg-input border border-border rounded-lg px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              className="w-full bg-input border border-border rounded-lg px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
             >
               <option value="">All Salespeople</option>
               {salespeople.map((sp) => (
@@ -343,7 +342,7 @@ export default function WeeklyReportExport({ visits, today, onClose }: WeeklyRep
                   <button
                     key={w.offset}
                     onClick={() => setWeekOffset(w.offset)}
-                    className={`text-left px-3 py-2.5 rounded-lg border text-sm transition-colors ${
+                    className={`text-left px-3 py-1.5 rounded-lg border text-sm transition-colors ${
                       weekOffset === w.offset
                         ? 'border-primary bg-primary/10 text-primary font-medium' :'border-border bg-input text-foreground hover:bg-muted'
                     }`}
@@ -423,7 +422,7 @@ export default function WeeklyReportExport({ visits, today, onClose }: WeeklyRep
               </>
             ) : (
               <>
-                <Download size={15} />
+                
                 Export {FORMAT_OPTIONS.find(f => f.value === format)?.label}
               </>
             )}

@@ -2,7 +2,6 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { X, AlertTriangle } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import { useConfig } from '@/context/ConfigContext';
 import { approveOrder, cancelOrder, deliverOrder } from '@/actions/orders';
@@ -69,7 +68,7 @@ export default function OrderDetailDrawer({ order, today, onClose, onUpdated }: 
           <div className="flex items-center gap-2">
             <OrderStatusBadge status={order.status} />
             <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground" aria-label="Close">
-              <X size={18} />
+              Close
             </button>
           </div>
         </div>
@@ -77,7 +76,7 @@ export default function OrderDetailDrawer({ order, today, onClose, onUpdated }: 
         <div className="p-5 space-y-5 flex-1">
           {order.status === 'PENDING_APPROVAL' && (
             <div className="flex gap-2 p-3 rounded-lg bg-warning-bg border border-warning/30 text-sm text-warning">
-              <AlertTriangle size={16} className="shrink-0 mt-0.5" />
+              
               <div>
                 <p className="font-semibold">On credit hold</p>
                 <p>{order.holdReason}</p>

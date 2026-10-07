@@ -1,22 +1,6 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import {
-  FileText,
-  Download,
-  Calendar,
-  TrendingUp,
-  Users,
-  ShoppingCart,
-  DollarSign,
-  BarChart2,
-  ChevronDown,
-  CheckCircle,
-  User,
-  Trophy,
-  Award,
-  Zap,
-} from 'lucide-react';
 import { formatRWF } from '@/lib/format';
 import { MONTH_LONG as MONTHS, monthLastDay } from '@/lib/dates';
 import { needsFollowUp } from '@/lib/visitRules';
@@ -171,15 +155,15 @@ function computeBadges(repSummaries: RepSummary[]): Record<string, RepBadge[]> {
 
   if (topPerformer) {
     if (!result[topPerformer.name]) result[topPerformer.name] = [];
-    result[topPerformer.name].push({ label: 'Top Performer', color: 'text-amber-700', bg: 'bg-amber-100 border-amber-300', icon: <Trophy size={11} /> });
+    result[topPerformer.name].push({ label: 'Top Performer', color: 'text-warning', bg: 'bg-warning-bg border-warning', icon: null });
   }
   if (mostImproved && mostImproved.totalVisits > 0) {
     if (!result[mostImproved.name]) result[mostImproved.name] = [];
-    result[mostImproved.name].push({ label: 'Most Improved', color: 'text-violet-700', bg: 'bg-violet-100 border-violet-300', icon: <Award size={11} /> });
+    result[mostImproved.name].push({ label: 'Most Improved', color: 'text-foreground', bg: 'bg-muted border-border', icon: null });
   }
   if (fastestCloser && fastestCloser.ordersPlaced > 0) {
     if (!result[fastestCloser.name]) result[fastestCloser.name] = [];
-    result[fastestCloser.name].push({ label: 'Fastest Closer', color: 'text-sky-700', bg: 'bg-sky-100 border-sky-300', icon: <Zap size={11} /> });
+    result[fastestCloser.name].push({ label: 'Fastest Closer', color: 'text-info', bg: 'bg-info-bg border-info', icon: null });
   }
 
   return result;
@@ -429,14 +413,14 @@ export default function MonthlyReportClient({ today, years, targets }: MonthlyRe
               onClick={handleExportCSV}
               className="flex items-center gap-2 border border-border bg-card text-foreground px-3 py-2 rounded-lg text-sm font-medium hover:bg-muted transition-colors"
             >
-              <Download size={15} />
+              
               <span>CSV</span>
             </button>
             <button
               onClick={handleExportPDF}
               className="flex items-center gap-2 border border-border bg-card text-foreground px-3 py-2 rounded-lg text-sm font-medium hover:bg-muted transition-colors"
             >
-              <FileText size={15} />
+              
               <span>PDF</span>
             </button>
           </div>
@@ -445,7 +429,7 @@ export default function MonthlyReportClient({ today, years, targets }: MonthlyRe
 
       {exportSuccess && (
         <div className="flex items-center gap-2 bg-positive/10 border border-positive/30 text-positive text-sm px-4 py-3 rounded-lg">
-          <CheckCircle size={16} />
+          
           {exportSuccess}
         </div>
       )}
@@ -456,7 +440,7 @@ export default function MonthlyReportClient({ today, years, targets }: MonthlyRe
           <button
             key={tab.key}
             onClick={() => handleTabChange(tab.key)}
-            className={`flex-1 min-w-[80px] px-4 py-2.5 rounded-lg text-sm font-semibold transition-all whitespace-nowrap ${
+            className={`flex-1 min-w-[80px] px-4 py-1.5 rounded-lg text-sm font-semibold transition-all whitespace-nowrap ${
               reportType === tab.key
                 ? 'bg-accent text-white shadow-sm'
                 : 'text-muted-foreground hover:text-foreground hover:bg-muted'
@@ -468,9 +452,9 @@ export default function MonthlyReportClient({ today, years, targets }: MonthlyRe
       </div>
 
       {/* Period selector */}
-      <div className="bg-card border border-border rounded-xl p-5">
+      <div className="bg-card border border-border p-3">
         <p className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
-          <Calendar size={16} className="text-accent" />
+          
           {reportType === 'daily' && 'Select Date'}
           {reportType === 'weekly' && 'Select Week'}
           {reportType === 'monthly' && 'Select Month & Year'}
@@ -485,7 +469,7 @@ export default function MonthlyReportClient({ today, years, targets }: MonthlyRe
               <label className="block text-sm font-semibold text-muted-foreground mb-2">Date</label>
               <input
                 type="date"
-                className="w-full border border-border rounded-lg px-4 py-3 text-base bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent/40 transition-colors cursor-pointer"
+                className="w-full border border-border rounded-lg px-2 py-1.5 text-base bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent/40 transition-colors cursor-pointer"
                 value={selectedDate}
                 onChange={(e) => { setSelectedDate(e.target.value); setGenerated(false); }}
               />
@@ -499,7 +483,7 @@ export default function MonthlyReportClient({ today, years, targets }: MonthlyRe
                 <label className="block text-sm font-semibold text-muted-foreground mb-2">Week</label>
                 <div className="relative">
                   <select
-                    className="w-full border border-border rounded-lg px-4 py-3 text-base bg-background text-foreground appearance-none focus:outline-none focus:ring-2 focus:ring-accent/40 pr-8 transition-colors cursor-pointer"
+                    className="w-full border border-border rounded-lg px-2 py-1.5 text-base bg-background text-foreground appearance-none focus:outline-none focus:ring-2 focus:ring-accent/40 pr-8 transition-colors cursor-pointer"
                     value={selectedWeek}
                     onChange={(e) => { setSelectedWeek(Number(e.target.value)); setGenerated(false); }}
                   >
@@ -512,20 +496,20 @@ export default function MonthlyReportClient({ today, years, targets }: MonthlyRe
                       );
                     })}
                   </select>
-                  <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                  
                 </div>
               </div>
               <div className="flex-1">
                 <label className="block text-sm font-semibold text-muted-foreground mb-2">Year</label>
                 <div className="relative">
                   <select
-                    className="w-full border border-border rounded-lg px-4 py-3 text-base bg-background text-foreground appearance-none focus:outline-none focus:ring-2 focus:ring-accent/40 pr-8 transition-colors cursor-pointer"
+                    className="w-full border border-border rounded-lg px-2 py-1.5 text-base bg-background text-foreground appearance-none focus:outline-none focus:ring-2 focus:ring-accent/40 pr-8 transition-colors cursor-pointer"
                     value={selectedWeekYear}
                     onChange={(e) => { setSelectedWeekYear(Number(e.target.value)); setGenerated(false); }}
                   >
                     {YEARS.map((y) => <option key={y} value={Number(y)}>{y}</option>)}
                   </select>
-                  <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                  
                 </div>
               </div>
             </>
@@ -538,26 +522,26 @@ export default function MonthlyReportClient({ today, years, targets }: MonthlyRe
                 <label className="block text-sm font-semibold text-muted-foreground mb-2">Month</label>
                 <div className="relative">
                   <select
-                    className="w-full border border-border rounded-lg px-4 py-3 text-base bg-background text-foreground appearance-none focus:outline-none focus:ring-2 focus:ring-accent/40 pr-8 transition-colors cursor-pointer"
+                    className="w-full border border-border rounded-lg px-2 py-1.5 text-base bg-background text-foreground appearance-none focus:outline-none focus:ring-2 focus:ring-accent/40 pr-8 transition-colors cursor-pointer"
                     value={selectedMonth}
                     onChange={(e) => { setSelectedMonth(Number(e.target.value)); setGenerated(false); }}
                   >
                     {MONTHS.map((m, i) => <option key={m} value={i}>{m}</option>)}
                   </select>
-                  <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                  
                 </div>
               </div>
               <div className="flex-1">
                 <label className="block text-sm font-semibold text-muted-foreground mb-2">Year</label>
                 <div className="relative">
                   <select
-                    className="w-full border border-border rounded-lg px-4 py-3 text-base bg-background text-foreground appearance-none focus:outline-none focus:ring-2 focus:ring-accent/40 pr-8 transition-colors cursor-pointer"
+                    className="w-full border border-border rounded-lg px-2 py-1.5 text-base bg-background text-foreground appearance-none focus:outline-none focus:ring-2 focus:ring-accent/40 pr-8 transition-colors cursor-pointer"
                     value={selectedYear}
                     onChange={(e) => { setSelectedYear(Number(e.target.value)); setGenerated(false); }}
                   >
                     {YEARS.map((y) => <option key={y} value={Number(y)}>{y}</option>)}
                   </select>
-                  <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                  
                 </div>
               </div>
             </>
@@ -570,26 +554,26 @@ export default function MonthlyReportClient({ today, years, targets }: MonthlyRe
                 <label className="block text-sm font-semibold text-muted-foreground mb-2">Quarter</label>
                 <div className="relative">
                   <select
-                    className="w-full border border-border rounded-lg px-4 py-3 text-base bg-background text-foreground appearance-none focus:outline-none focus:ring-2 focus:ring-accent/40 pr-8 transition-colors cursor-pointer"
+                    className="w-full border border-border rounded-lg px-2 py-1.5 text-base bg-background text-foreground appearance-none focus:outline-none focus:ring-2 focus:ring-accent/40 pr-8 transition-colors cursor-pointer"
                     value={selectedQuarter}
                     onChange={(e) => { setSelectedQuarter(Number(e.target.value)); setGenerated(false); }}
                   >
                     {QUARTERS.map((q, i) => <option key={i} value={i}>{q.label}</option>)}
                   </select>
-                  <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                  
                 </div>
               </div>
               <div className="flex-1">
                 <label className="block text-sm font-semibold text-muted-foreground mb-2">Year</label>
                 <div className="relative">
                   <select
-                    className="w-full border border-border rounded-lg px-4 py-3 text-base bg-background text-foreground appearance-none focus:outline-none focus:ring-2 focus:ring-accent/40 pr-8 transition-colors cursor-pointer"
+                    className="w-full border border-border rounded-lg px-2 py-1.5 text-base bg-background text-foreground appearance-none focus:outline-none focus:ring-2 focus:ring-accent/40 pr-8 transition-colors cursor-pointer"
                     value={selectedQuarterYear}
                     onChange={(e) => { setSelectedQuarterYear(Number(e.target.value)); setGenerated(false); }}
                   >
                     {YEARS.map((y) => <option key={y} value={Number(y)}>{y}</option>)}
                   </select>
-                  <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                  
                 </div>
               </div>
             </>
@@ -601,13 +585,13 @@ export default function MonthlyReportClient({ today, years, targets }: MonthlyRe
               <label className="block text-sm font-semibold text-muted-foreground mb-2">Year</label>
               <div className="relative">
                 <select
-                  className="w-full border border-border rounded-lg px-4 py-3 text-base bg-background text-foreground appearance-none focus:outline-none focus:ring-2 focus:ring-accent/40 pr-8 transition-colors cursor-pointer"
+                  className="w-full border border-border rounded-lg px-2 py-1.5 text-base bg-background text-foreground appearance-none focus:outline-none focus:ring-2 focus:ring-accent/40 pr-8 transition-colors cursor-pointer"
                   value={selectedYearOnly}
                   onChange={(e) => { setSelectedYearOnly(Number(e.target.value)); setGenerated(false); }}
                 >
                   {YEARS.map((y) => <option key={y} value={Number(y)}>{y}</option>)}
                 </select>
-                <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                
               </div>
             </div>
           )}
@@ -616,18 +600,18 @@ export default function MonthlyReportClient({ today, years, targets }: MonthlyRe
           {canViewAllReps && (
             <div className="flex-1">
               <label className="block text-sm font-semibold text-muted-foreground mb-2">
-                <span className="flex items-center gap-1"><User size={11} /> Salesperson</span>
+                <span className="flex items-center gap-1"> Salesperson</span>
               </label>
               <div className="relative">
                 <select
-                  className="w-full border border-border rounded-lg px-4 py-3 text-base bg-background text-foreground appearance-none focus:outline-none focus:ring-2 focus:ring-accent/40 pr-8 transition-colors cursor-pointer"
+                  className="w-full border border-border rounded-lg px-2 py-1.5 text-base bg-background text-foreground appearance-none focus:outline-none focus:ring-2 focus:ring-accent/40 pr-8 transition-colors cursor-pointer"
                   value={selectedRep}
                   onChange={(e) => { setSelectedRep(e.target.value); setGenerated(false); }}
                 >
                   <option value="">All Reps</option>
                   {config.salespeople.map((sp) => <option key={sp.id} value={sp.label}>{sp.label}</option>)}
                 </select>
-                <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                
               </div>
             </div>
           )}
@@ -636,10 +620,7 @@ export default function MonthlyReportClient({ today, years, targets }: MonthlyRe
           {!canViewAllReps && (
             <div className="flex-1">
               <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Salesperson</label>
-              <div className="flex items-center gap-2 px-3 py-2.5 bg-primary/10 border border-primary/20 rounded-lg">
-                <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-[10px] font-bold text-primary shrink-0">
-                  {currentUser.initials}
-                </div>
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 border border-primary/20 rounded-lg">
                 <span className="text-sm font-semibold text-primary">{currentUser.name}</span>
               </div>
             </div>
@@ -648,9 +629,9 @@ export default function MonthlyReportClient({ today, years, targets }: MonthlyRe
           <button
             onClick={handleGenerate}
             disabled={loading}
-            className="flex items-center gap-2 bg-accent text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-accent/90 transition-colors shadow-sm whitespace-nowrap disabled:opacity-60"
+            className="flex items-center gap-2 bg-accent text-white px-5 py-1.5 rounded-lg text-sm font-semibold hover:bg-accent/90 transition-colors shadow-sm whitespace-nowrap disabled:opacity-60"
           >
-            <FileText size={15} />
+            
             {loading ? 'Loading...' : 'Generate Report'}
           </button>
         </div>
@@ -660,8 +641,8 @@ export default function MonthlyReportClient({ today, years, targets }: MonthlyRe
       {generated && (
         <>
           {/* Period label banner */}
-          <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/40 border border-border rounded-lg px-4 py-2.5">
-            <Calendar size={14} className="text-accent shrink-0" />
+          <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/40 border border-border rounded-lg px-4 py-1.5">
+            
             <span>
               Showing <span className="font-semibold text-foreground">{reportType.charAt(0).toUpperCase() + reportType.slice(1)} Report</span> for{' '}
               <span className="font-semibold text-foreground">{getPeriodLabel()}</span>
@@ -672,10 +653,10 @@ export default function MonthlyReportClient({ today, years, targets }: MonthlyRe
           {/* KPI cards */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             {[
-              { label: 'Total Sales', value: formatRWF(report.totalSales), icon: <DollarSign size={18} />, color: 'text-positive' },
-              { label: 'Total Visits', value: report.totalVisits, icon: <Users size={18} />, color: 'text-accent' },
-              { label: 'Orders Placed', value: report.ordersPlaced, icon: <ShoppingCart size={18} />, color: 'text-foreground' },
-              { label: 'Conversion Rate', value: `${conversionRate}%`, icon: <TrendingUp size={18} />, color: 'text-positive' },
+              { label: 'Total Sales', value: formatRWF(report.totalSales), icon: null, color: 'text-positive' },
+              { label: 'Total Visits', value: report.totalVisits, icon: null, color: 'text-accent' },
+              { label: 'Orders Placed', value: report.ordersPlaced, icon: null, color: 'text-foreground' },
+              { label: 'Conversion Rate', value: `${conversionRate}%`, icon: null, color: 'text-positive' },
             ].map((kpi) => (
               <div key={kpi.label} className="bg-card border border-border rounded-xl p-4">
                 <div className="flex items-center justify-between mb-2">
@@ -692,15 +673,15 @@ export default function MonthlyReportClient({ today, years, targets }: MonthlyRe
             <div className="bg-card border border-border rounded-xl overflow-hidden">
               <div className="px-5 py-4 border-b border-border flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Trophy size={16} className="text-amber-500" />
+                  
                   <h2 className="font-semibold text-foreground text-sm">
                     Rep Leaderboard — {getPeriodLabel()}
                   </h2>
                 </div>
                 <div className="hidden sm:flex items-center gap-3 text-xs text-muted-foreground">
-                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded border bg-amber-100 border-amber-300 text-amber-700"><Trophy size={10} /> Top Performer</span>
-                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded border bg-violet-100 border-violet-300 text-violet-700"><Award size={10} /> Most Improved</span>
-                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded border bg-sky-100 border-sky-300 text-sky-700"><Zap size={10} /> Fastest Closer</span>
+                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded border bg-warning-bg border-warning text-warning"> Top Performer</span>
+                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded border bg-muted border-border text-foreground"> Most Improved</span>
+                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded border bg-info-bg border-info text-info"> Fastest Closer</span>
                 </div>
               </div>
 
@@ -739,17 +720,17 @@ export default function MonthlyReportClient({ today, years, targets }: MonthlyRe
                         let achievementColor = 'text-muted-foreground';
                         let achievementBg = 'bg-muted/50';
                         if (achievementPct >= 100) { achievementColor = 'text-positive'; achievementBg = 'bg-positive/10'; }
-                        else if (achievementPct >= 75) { achievementColor = 'text-amber-600'; achievementBg = 'bg-amber-50'; }
-                        else if (achievementPct >= 50) { achievementColor = 'text-orange-600'; achievementBg = 'bg-orange-50'; }
+                        else if (achievementPct >= 75) { achievementColor = 'text-warning'; achievementBg = 'bg-warning-bg'; }
+                        else if (achievementPct >= 50) { achievementColor = 'text-warning'; achievementBg = 'bg-warning-bg'; }
 
                         let kgColor = 'text-muted-foreground';
                         let kgBg = 'bg-muted/50';
                         if (achievementKgPct >= 100) { kgColor = 'text-positive'; kgBg = 'bg-positive/10'; }
-                        else if (achievementKgPct >= 75) { kgColor = 'text-amber-600'; kgBg = 'bg-amber-50'; }
-                        else if (achievementKgPct >= 50) { kgColor = 'text-orange-600'; kgBg = 'bg-orange-50'; }
+                        else if (achievementKgPct >= 75) { kgColor = 'text-warning'; kgBg = 'bg-warning-bg'; }
+                        else if (achievementKgPct >= 50) { kgColor = 'text-warning'; kgBg = 'bg-warning-bg'; }
 
                         return (
-                          <tr key={rep.name} className={`hover:bg-muted/30 transition-colors ${isTop ? 'bg-amber-50/40' : ''}`}>
+                          <tr key={rep.name} className={`hover:bg-muted/30 transition-colors ${isTop ? 'bg-warning-bg' : ''}`}>
                             <td className="px-3 py-3 text-center">
                               {idx < 3 ? <span className="text-lg leading-none">{rankMedals[idx]}</span> : <span className="text-sm font-bold text-muted-foreground">{idx + 1}</span>}
                             </td>
@@ -783,7 +764,7 @@ export default function MonthlyReportClient({ today, years, targets }: MonthlyRe
                                   <div className="flex flex-col items-center gap-1">
                                     <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${achievementBg} ${achievementColor}`}>{achievementPct}%</span>
                                     <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
-                                      <div className={`h-full rounded-full transition-all ${achievementPct >= 100 ? 'bg-positive' : achievementPct >= 75 ? 'bg-amber-400' : achievementPct >= 50 ? 'bg-orange-400' : 'bg-muted-foreground/40'}`} style={{ width: `${Math.min(achievementPct, 100)}%` }} />
+                                      <div className={`h-full rounded-full transition-all ${achievementPct >= 100 ? 'bg-positive' : achievementPct >= 75 ? 'bg-warning' : achievementPct >= 50 ? 'bg-warning' : 'bg-muted-foreground/40'}`} style={{ width: `${Math.min(achievementPct, 100)}%` }} />
                                     </div>
                                   </div>
                                 </td>
@@ -791,7 +772,7 @@ export default function MonthlyReportClient({ today, years, targets }: MonthlyRe
                                   <div className="flex flex-col items-center gap-1">
                                     <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${kgBg} ${kgColor}`}>{achievementKgPct}%</span>
                                     <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
-                                      <div className={`h-full rounded-full transition-all ${achievementKgPct >= 100 ? 'bg-positive' : achievementKgPct >= 75 ? 'bg-amber-400' : achievementKgPct >= 50 ? 'bg-orange-400' : 'bg-muted-foreground/40'}`} style={{ width: `${Math.min(achievementKgPct, 100)}%` }} />
+                                      <div className={`h-full rounded-full transition-all ${achievementKgPct >= 100 ? 'bg-positive' : achievementKgPct >= 75 ? 'bg-warning' : achievementKgPct >= 50 ? 'bg-warning' : 'bg-muted-foreground/40'}`} style={{ width: `${Math.min(achievementKgPct, 100)}%` }} />
                                     </div>
                                   </div>
                                 </td>
@@ -854,7 +835,7 @@ export default function MonthlyReportClient({ today, years, targets }: MonthlyRe
           {/* Rep breakdown table */}
           <div className="bg-card border border-border rounded-xl overflow-hidden">
             <div className="px-5 py-4 border-b border-border flex items-center gap-2">
-              <BarChart2 size={16} className="text-accent" />
+              
               <h2 className="font-semibold text-foreground text-sm">
                 {canViewAllReps
                   ? `${effectiveRep ? effectiveRep + ' — ' : 'Rep Performance — '}${getPeriodLabel()}`
@@ -893,13 +874,13 @@ export default function MonthlyReportClient({ today, years, targets }: MonthlyRe
 
                       let rwfColor = 'text-muted-foreground';
                       if (achPct >= 100) rwfColor = 'text-positive';
-                      else if (achPct >= 75) rwfColor = 'text-amber-600';
-                      else if (achPct > 0) rwfColor = 'text-orange-600';
+                      else if (achPct >= 75) rwfColor = 'text-warning';
+                      else if (achPct > 0) rwfColor = 'text-warning';
 
                       let kgColor = 'text-muted-foreground';
                       if (achKgPct >= 100) kgColor = 'text-positive';
-                      else if (achKgPct >= 75) kgColor = 'text-amber-600';
-                      else if (achKgPct > 0) kgColor = 'text-orange-600';
+                      else if (achKgPct >= 75) kgColor = 'text-warning';
+                      else if (achKgPct > 0) kgColor = 'text-warning';
 
                       return (
                         <tr key={rep.name} className={`hover:bg-muted/30 transition-colors ${idx === 0 && canViewAllReps && !effectiveRep ? 'bg-positive/5' : ''}`}>

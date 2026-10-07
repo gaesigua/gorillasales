@@ -1,53 +1,39 @@
 'use client';
 
 import React from 'react';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,  } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import type { TrendPoint } from '@/lib/types';
+
+// Validated categorical pair (light surface): actual = blue, target = ochre
+const ACTUAL = '#2f6fb7';
+const TARGET = '#b36a2e';
 
 interface CustomTooltipProps {
   active?: boolean;
-  payload?: Array<{ name: string; value: number; color: string }>;
+  payload?: Array<{ name: string; value: number; color: string; dataKey: string }>;
   label?: string;
 }
 
 function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
   if (!active || !payload || !payload.length) return null;
+  const target = payload.find((p) => p.dataKey === 'target')?.value ?? 0;
+  const actual = payload.find((p) => p.dataKey === 'actual')?.value ?? 0;
   return (
-    <div className="bg-card border border-border rounded-lg shadow-lg px-4 py-3 min-w-[180px]">
-      <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">
-        {label}
-      </p>
+    <div className="bg-card border border-foreground px-2 py-1 text-xs min-w-[170px]">
+      <p className="font-bold mb-1">{label}</p>
       {payload.map((entry) => (
-        <div key={`tt-${entry.name}`} className="flex items-center justify-between gap-4 mb-1">
-          <div className="flex items-center gap-1.5">
-            <span
-              className="w-2 h-2 rounded-full"
-              style={{ backgroundColor: entry.color }}
-            />
-            <span className="text-xs text-muted-foreground capitalize">
-              {entry.name}
-            </span>
-          </div>
-          <span className="text-xs font-semibold text-foreground font-tabular">
-            RWF {(entry.value / 1000000).toFixed(2)}M
+        <div key={`tt-${entry.name}`} className="flex items-center justify-between gap-4">
+          <span className="flex items-center gap-1">
+            <span className="inline-block w-2 h-2" style={{ backgroundColor: entry.color }} />
+            {entry.name}
           </span>
+          <span className="font-tabular">RWF {(entry.value / 1000000).toFixed(2)}M</span>
         </div>
       ))}
-      {payload.length === 2 && (
-        <div className="mt-2 pt-2 border-t border-border">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] text-muted-foreground">Achievement</span>
-            <span
-              className={`text-[11px] font-bold ${
-                (payload[1]?.value / payload[0]?.value) * 100 >= 80
-                  ? 'text-positive' :'text-negative'
-              }`}
-            >
-              {payload[0]?.value
-                ? `${((payload[1].value / payload[0].value) * 100).toFixed(1)}%`
-                : '—'}
-            </span>
-          </div>
+      {target > 0 && (
+        <div className="flex justify-between border-t border-border mt-1 pt-1">
+          <span>Achievement</span>
+          <span className="font-bold">{((actual / target) * 100).toFixed(1)}%</span>
         </div>
       )}
     </div>
@@ -57,22 +43,12 @@ function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
 export default function SalesTrendChart({ data }: { data: TrendPoint[] }) {
   return (
     <ResponsiveContainer width="100%" height={260}>
-      <AreaChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-        <defs>
-          <linearGradient id="gradTarget" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="var(--border)" stopOpacity={0.6} />
-            <stop offset="95%" stopColor="var(--border)" stopOpacity={0} />
-          </linearGradient>
-          <linearGradient id="gradActual" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="var(--accent)" stopOpacity={0.35} />
-            <stop offset="95%" stopColor="var(--accent)" stopOpacity={0} />
-          </linearGradient>
-        </defs>
-        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+      <LineChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+        <CartesianGrid stroke="#e4e4e4" vertical={false} />
         <XAxis
           dataKey="month"
-          tick={{ fill: 'var(--muted-foreground)', fontSize: 12 }}
-          axisLine={false}
+          tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }}
+          axisLine={{ stroke: 'var(--border)' }}
           tickLine={false}
         />
         <YAxis
@@ -80,35 +56,36 @@ export default function SalesTrendChart({ data }: { data: TrendPoint[] }) {
           tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }}
           axisLine={false}
           tickLine={false}
-          width={48}
+          width={40}
         />
-        <Tooltip content={<CustomTooltip />} />
+        <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'var(--border)' }} isAnimationActive={false} />
         <Legend
-          iconType="circle"
-          iconSize={8}
-          wrapperStyle={{ fontSize: 12, color: 'var(--muted-foreground)', paddingTop: 8 }}
+          iconType="plainline"
+          iconSize={14}
+          wrapperStyle={{ fontSize: 11, paddingTop: 6 }}
+          formatter={(value) => <span className="text-foreground">{value}</span>}
         />
-        <Area
-          type="monotone"
+        <Line
+          type="linear"
           dataKey="target"
           name="Target"
-          stroke="var(--border)"
+          stroke={TARGET}
           strokeWidth={2}
           strokeDasharray="5 3"
-          fill="url(#gradTarget)"
           dot={false}
+          isAnimationActive={false}
         />
-        <Area
-          type="monotone"
+        <Line
+          type="linear"
           dataKey="actual"
           name="Actual"
-          stroke="var(--accent)"
-          strokeWidth={2.5}
-          fill="url(#gradActual)"
-          dot={{ fill: 'var(--accent)', strokeWidth: 0, r: 3 }}
-          activeDot={{ r: 5, fill: 'var(--accent)' }}
+          stroke={ACTUAL}
+          strokeWidth={2}
+          dot={{ fill: ACTUAL, stroke: '#fff', strokeWidth: 2, r: 4 }}
+          activeDot={{ r: 5, fill: ACTUAL, stroke: '#fff', strokeWidth: 2 }}
+          isAnimationActive={false}
         />
-      </AreaChart>
+      </LineChart>
     </ResponsiveContainer>
   );
 }

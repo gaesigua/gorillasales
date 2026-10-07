@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Trash2, Eye, ChevronUp, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { formatRWFFull } from '@/lib/format';
 import { isOrder, needsFollowUp } from '@/lib/visitRules';
 import Link from 'next/link';
@@ -72,20 +71,17 @@ export default function RecentEntriesTable({ entries, onDelete, canDelete }: Rec
   const SortIcon = ({ col }: { col: SortKey }) =>
     sortKey === col ? (
       sortDir === 'asc' ? (
-        <ChevronUp size={12} className="text-accent" />
+        <span aria-hidden="true">▲</span>
       ) : (
-        <ChevronDown size={12} className="text-accent" />
+        <span aria-hidden="true">▼</span>
       )
     ) : (
-      <ChevronDown size={12} className="text-muted-foreground opacity-40" />
+      <span aria-hidden="true">▼</span>
     );
 
   if (entries.length === 0) {
     return (
       <div className="bg-card border border-border rounded-xl p-12 text-center">
-        <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center mx-auto mb-3">
-          <Eye size={22} className="text-muted-foreground" />
-        </div>
         <h4 className="text-sm font-semibold text-foreground mb-1">
           No visit logs yet
         </h4>
@@ -205,7 +201,7 @@ export default function RecentEntriesTable({ entries, onDelete, canDelete }: Rec
                         onClick={() => handleDelete(entry)}
                         className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-negative/10 hover:text-negative transition-colors disabled:opacity-40"
                       >
-                        <Trash2 size={14} />
+                        Delete
                       </button>
                     )}
                   </div>
@@ -227,7 +223,7 @@ export default function RecentEntriesTable({ entries, onDelete, canDelete }: Rec
             disabled={page === 1}
             className="w-7 h-7 rounded-md flex items-center justify-center border border-border text-muted-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
-            <ChevronLeft size={13} />
+            Prev
           </button>
           {Array.from({ length: totalPages }).map((_, i) => (
             <button
@@ -247,7 +243,7 @@ export default function RecentEntriesTable({ entries, onDelete, canDelete }: Rec
             disabled={page === totalPages}
             className="w-7 h-7 rounded-md flex items-center justify-center border border-border text-muted-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
-            <ChevronRight size={13} />
+            Next
           </button>
         </div>
       </div>

@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Link from 'next/link';
 import DashboardKpiGrid from '@/app/(app)/dashboard/components/DashboardKpiGrid';
 import RepTargetsTable from '@/app/(app)/dashboard/components/RepTargetsTable';
 import OverdueFollowUpsFeed from '@/app/(app)/dashboard/components/OverdueFollowUpsFeed';
@@ -47,6 +48,21 @@ export default function DashboardClient({ data }: { data: DashboardData }) {
 
         {/* KPI Bento Grid */}
         <DashboardKpiGrid data={data} />
+
+        {/* Orders & receivables */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[
+            { label: 'Outstanding receivables', value: formatRWF(data.receivables.total), href: '/receivables', alert: false },
+            { label: 'Overdue', value: formatRWF(data.receivables.overdue), href: '/receivables', alert: data.receivables.overdue > 0 },
+            { label: 'Orders on credit hold', value: String(data.ordersOnHold), href: '/orders', alert: data.ordersOnHold > 0 },
+            { label: 'Orders to deliver', value: String(data.ordersToDeliver), href: '/orders', alert: false },
+          ].map((k) => (
+            <Link key={k.label} href={k.href} className="bg-card border border-border rounded-xl p-4 hover:bg-muted/40">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{k.label}</p>
+              <p className={`text-xl font-bold font-tabular mt-1 ${k.alert ? 'text-negative' : 'text-foreground'}`}>{k.value}</p>
+            </Link>
+          ))}
+        </div>
 
         {/* Charts + Overdue Feed row */}
         <div className="grid grid-cols-1 xl:grid-cols-3 2xl:grid-cols-3 gap-4">

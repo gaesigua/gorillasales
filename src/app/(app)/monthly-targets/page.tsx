@@ -1,5 +1,6 @@
 import { canViewAllReps, requirePageSession } from '@/lib/tenant';
-import { getAppConfig, listMonthlyTargets } from '@/lib/data/config';
+import { getAppConfig, listCommissionRules, listMonthlyTargets } from '@/lib/data/config';
+import { listOrders } from '@/lib/data/orders';
 import { listVisits } from '@/lib/data/visits';
 import { monthLastDay, parsePeriodParams } from '@/lib/dates';
 import MonthlyTargetsClient from './components/MonthlyTargetsClient';
@@ -14,10 +15,13 @@ export default async function MonthlyTargetsPage({ searchParams }: PageProps) {
   const allReps = canViewAllReps(session);
   const from = `${year}-${String(month + 1).padStart(2, '0')}-01`;
 
-  const [config, visits, yearTargets] = await Promise.all([
+  const to = monthLastDay(year, month);
+  const [config, visits, orders, yearTargets, commissionRules] = await Promise.all([
     getAppConfig(session),
-    listVisits(session, { from, to: monthLastDay(year, month) }),
+    listVisits(session, { from, to }),
+    listOrders(session, { from, to, excludeCancelled: true }),
     listMonthlyTargets(session, { year }),
+    listCommissionRules(session),
   ]);
   // Sales officers only see their own row and target
   const targets = yearTargets.filter((t) => t.month === month && (allReps || t.salespersonId === session.userId));
@@ -30,7 +34,9 @@ export default async function MonthlyTargetsPage({ searchParams }: PageProps) {
       years={[currentYear - 2, currentYear - 1, currentYear, currentYear + 1]}
       reps={reps}
       visits={visits}
+      orders={orders}
       targets={targets}
+      commissionRules={commissionRules}
     />
   );
 }

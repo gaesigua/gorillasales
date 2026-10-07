@@ -6,7 +6,18 @@
 //   SEED_ALLOW_RESET=yes    required when the database already has data: the seed WIPES it
 //
 // Never run this against a production database.
-import { PrismaClient, UserRole, PaymentStatus, CustomerType, CustomerStatus, FieldType, LookupType } from '@prisma/client';
+import {
+  PrismaClient,
+  UserRole,
+  CustomerType,
+  CustomerStatus,
+  FieldType,
+  LookupType,
+  OrderStatus,
+  PaymentMethod,
+  DocumentType,
+} from '@prisma/client';
+import { computeOrderTotals } from '../src/lib/domain/money';
 import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
@@ -105,6 +116,30 @@ const STAGES = [
   { name: 'Lost', probability: 0, color: '#EF4444' },
 ];
 
+// Commercial terms by channel: payment days (0 = cash on delivery) and price list
+const TERMS: Record<string, { days: number; priceList?: string }> = {
+  Wholesalers: { days: 30, priceList: 'Wholesale' },
+  Supermarkets: { days: 30 },
+  Hotels: { days: 30, priceList: 'Hotels & HoReCa' },
+  Offices: { days: 14, priceList: 'Hotels & HoReCa' },
+  'Coffee Shops': { days: 14 },
+  Shops: { days: 0 },
+  Stores: { days: 0 },
+};
+
+// District per sales area, for the Province/District address fields
+const AREA_DISTRICT: Record<string, string> = {
+  'Kigali Centre': 'Nyarugenge',
+  Nyabugogo: 'Nyarugenge',
+  Nyamirambo: 'Nyarugenge',
+  Kiyovu: 'Nyarugenge',
+  Remera: 'Gasabo',
+  Kimihurura: 'Gasabo',
+  Gisozi: 'Gasabo',
+  Nyarutarama: 'Gasabo',
+  Kacyiru: 'Gasabo',
+};
+
 // Order sizes by channel (units per order)
 const ORDER_QTY: Record<string, [number, number]> = {
   Wholesalers: [80, 200],
@@ -133,6 +168,11 @@ async function main() {
   await prisma.auditLog.deleteMany();
   await prisma.customFieldValue.deleteMany();
   await prisma.customFieldDefinition.deleteMany();
+  await prisma.payment.deleteMany();
+  await prisma.invoice.deleteMany();
+  await prisma.salesOrderLine.deleteMany();
+  await prisma.salesOrder.deleteMany();
+  await prisma.documentSequence.deleteMany();
   await prisma.visitLog.deleteMany();
   await prisma.pipelineDeal.deleteMany();
   await prisma.pipelineStage.deleteMany();
@@ -140,13 +180,23 @@ async function main() {
   await prisma.commissionRule.deleteMany();
   await prisma.lookupValue.deleteMany();
   await prisma.customer.deleteMany();
+  await prisma.priceListItem.deleteMany();
+  await prisma.priceList.deleteMany();
   await prisma.product.deleteMany();
   await prisma.user.deleteMany();
   await prisma.organization.deleteMany();
 
   // 2. Organization
   const org = await prisma.organization.create({
-    data: { name: 'Gorilla Coffee Distribution Ltd', slug: 'gorilla-coffee', currency: 'RWF', timezone: 'Africa/Kigali' },
+    data: {
+      name: 'Gorilla Coffee Distribution Ltd',
+      slug: 'gorilla-coffee',
+      currency: 'RWF',
+      timezone: 'Africa/Kigali',
+      tin: '101234567',
+      vatRate: 18,
+      pricesIncludeVat: true,
+    },
   });
   const organizationId = org.id;
 
@@ -186,8 +236,37 @@ async function main() {
     products.set(p.name, { id: product.id, unitPrice: p.unitPrice });
   }
 
+  // 5b. Price lists: HoReCa ~5% and wholesale ~10% below standard on roasted coffee
+  const priceLists = new Map<string, { id: string; prices: Map<string, number> }>();
+  for (const [name, discount] of [
+    ['Hotels & HoReCa', 0.05],
+    ['Wholesale', 0.1],
+  ] as const) {
+    const items = PRODUCTS.filter((p) => p.category === 'Roasted Coffee' || p.category === 'Green Coffee').map((p) => ({
+      productId: products.get(p.name)!.id,
+      unitPrice: Math.round((p.unitPrice * (1 - discount)) / 10) * 10,
+    }));
+    const list = await prisma.priceList.create({
+      data: { organizationId, name, description: `${discount * 100}% off roasted & green coffee`, items: { create: items } },
+    });
+    priceLists.set(name, { id: list.id, prices: new Map(items.map((i) => [i.productId, i.unitPrice])) });
+  }
+  const priceOf = (productName: string, priceListName?: string) => {
+    const product = products.get(productName)!;
+    return (priceListName && priceLists.get(priceListName)?.prices.get(product.id)) || product.unitPrice;
+  };
+
   // 6. Customers
-  const customers: { id: string; name: string; category: string; repId: string; productName: string; status: CustomerStatus }[] = [];
+  const customers: {
+    id: string;
+    name: string;
+    category: string;
+    repId: string;
+    productName: string;
+    status: CustomerStatus;
+    terms: number;
+    priceList?: string;
+  }[] = [];
   for (const [i, c] of CUSTOMERS.entries()) {
     const [name, category, area, contactPerson, phone, rep, mainProduct, monthlyPotential, status, remarks, isNew] = c;
     const customer = await prisma.customer.create({
@@ -202,14 +281,29 @@ async function main() {
         salespersonId: userId(rep),
         mainProductId: products.get(mainProduct)!.id,
         monthlyPotential,
-        creditLimit: monthlyPotential * 2,
+        paymentTermsDays: TERMS[category]?.days ?? 0,
+        creditLimit: (TERMS[category]?.days ?? 0) > 0 ? monthlyPotential * 3 : 0,
+        priceListId: TERMS[category]?.priceList ? priceLists.get(TERMS[category].priceList!)!.id : null,
+        tin: i % 3 === 0 ? null : String(100000000 + i * 7919),
+        province: 'Kigali City',
+        district: AREA_DISTRICT[area] ?? null,
+        sector: area,
         status,
         customerType: isNew ? CustomerType.NEW_CUSTOMER : CustomerType.EXISTING_CUSTOMER,
         remarks: remarks || null,
         createdAt: isNew ? dateCol(addDays(today, -randInt(1, 5))) : dateCol(addDays(today, -randInt(200, 500))),
       },
     });
-    customers.push({ id: customer.id, name, category, repId: userId(rep), productName: mainProduct, status });
+    customers.push({
+      id: customer.id,
+      name,
+      category,
+      repId: userId(rep),
+      productName: mainProduct,
+      status,
+      terms: TERMS[category]?.days ?? 0,
+      priceList: TERMS[category]?.priceList,
+    });
   }
 
   // 7. Pipeline
@@ -254,11 +348,17 @@ async function main() {
     }
   }
 
-  // 9. Visit history: ~6 months up to today, roughly 3 visits per rep per week
+  // 9. Visit history with orders, invoices and payments: ~6 months up to today
   const productNames = [...products.keys()];
   const activeCustomers = customers.filter((c) => c.status !== 'INACTIVE');
-  const startDate = addDays(`${new Date(Date.UTC(ty, tm - 6, 1)).toISOString().slice(0, 7)}-01`, 0);
-  const visits = [];
+  const startDate = `${new Date(Date.UTC(ty, tm - 6, 1)).toISOString().slice(0, 7)}-01`;
+  const seq: Record<DocumentType, number> = { SALES_ORDER: 0, INVOICE: 0, PAYMENT: 0 };
+  const docNo = (type: DocumentType, prefix: string) => `${prefix}-${String(++seq[type]).padStart(6, '0')}`;
+  const methods: PaymentMethod[] = ['CASH', 'MTN_MOMO', 'MTN_MOMO', 'AIRTEL_MONEY', 'BANK_TRANSFER'];
+  let visitCount = 0;
+  let orderCount = 0;
+  let heldOnce = false;
+
   for (let day = startDate; day <= today; day = addDays(day, 1)) {
     if (dateCol(day).getUTCDay() === 0) continue; // no Sunday visits
     for (const repName of Object.keys(MONTHLY_TARGETS)) {
@@ -269,29 +369,115 @@ async function main() {
       const roll = rand();
       const isOrder = customer.status === 'ACTIVE' && roll < 0.7;
       const needsFollowUp = !isOrder && roll < 0.85;
-      const productName = isOrder ? (rand() < 0.6 ? customer.productName : pick(productNames)) : null;
-      const product = productName ? products.get(productName)! : null;
-      const [minQty, maxQty] = ORDER_QTY[customer.category] ?? [10, 40];
-      const quantity = isOrder ? randInt(minQty, maxQty) : 0;
-      const unitPrice = product ? product.unitPrice : 0;
-      visits.push({
-        organizationId,
-        salespersonId: userId(repName),
-        customerId: customer.id,
-        dateOfVisit: dateCol(day),
-        visitOutcome: isOrder ? OUTCOMES.order : needsFollowUp ? OUTCOMES.followUp : OUTCOMES.visit,
-        productId: product?.id ?? null,
-        quantity,
-        unitPrice,
-        salesValue: quantity * unitPrice,
-        paymentStatus: isOrder ? pick([PaymentStatus.PAID, PaymentStatus.PAID, PaymentStatus.CREDIT, PaymentStatus.PENDING]) : PaymentStatus.PENDING,
-        nextFollowUpDate: needsFollowUp ? dateCol(addDays(day, randInt(3, 14))) : null,
-        remarks: needsFollowUp ? 'Follow up on pricing and stock levels' : null,
-        createdAt: new Date(`${day}T08:00:00.000Z`),
+
+      const visit = await prisma.visitLog.create({
+        data: {
+          organizationId,
+          salespersonId: userId(repName),
+          customerId: customer.id,
+          dateOfVisit: dateCol(day),
+          visitOutcome: isOrder ? OUTCOMES.order : needsFollowUp ? OUTCOMES.followUp : OUTCOMES.visit,
+          nextFollowUpDate: needsFollowUp ? dateCol(addDays(day, randInt(3, 14))) : null,
+          remarks: needsFollowUp ? 'Follow up on pricing and stock levels' : null,
+          createdAt: new Date(`${day}T08:00:00.000Z`),
+        },
       });
+      visitCount++;
+      if (!isOrder) continue;
+
+      // 1-3 products, usually including the customer's main product
+      const chosen = new Set([rand() < 0.7 ? customer.productName : pick(productNames)]);
+      const extra = randInt(0, 2);
+      for (let k = 0; k < extra; k++) chosen.add(pick(productNames));
+      const [minQty, maxQty] = ORDER_QTY[customer.category] ?? [10, 40];
+      const lines = [...chosen].map((name, idx) => ({
+        productId: products.get(name)!.id,
+        quantity: idx === 0 ? randInt(minQty, maxQty) : randInt(Math.ceil(minQty / 3), Math.ceil(maxQty / 3)),
+        unitPrice: priceOf(name, customer.priceList),
+        unitWeightKg: PRODUCTS.find((p) => p.name === name)!.weightKg,
+      }));
+      const totals = computeOrderTotals(lines, 18, true);
+
+      // Recent orders are still open; one recent order is on credit hold
+      const age = Math.round((dateCol(today).getTime() - dateCol(day).getTime()) / 86400000);
+      let status: OrderStatus = age > 4 ? 'DELIVERED' : 'CONFIRMED';
+      if (status === 'CONFIRMED' && !heldOnce && customer.terms > 0) {
+        status = 'PENDING_APPROVAL';
+        heldOnce = true;
+      }
+      const deliveredOn = status === 'DELIVERED' ? addDays(day, randInt(0, 2)) : null;
+
+      const order = await prisma.salesOrder.create({
+        data: {
+          organizationId,
+          orderNumber: docNo('SALES_ORDER', 'SO'),
+          customerId: customer.id,
+          salespersonId: userId(repName),
+          visitLogId: visit.id,
+          orderDate: dateCol(day),
+          status,
+          holdReason: status === 'PENDING_APPROVAL' ? 'Credit limit exceeded (demo data)' : null,
+          paymentTermsDays: customer.terms,
+          subtotal: totals.subtotal,
+          vatAmount: totals.vatAmount,
+          total: totals.total,
+          createdById: userId(repName),
+          deliveredById: deliveredOn ? userId('Gakuba Samson') : null,
+          deliveredAt: deliveredOn ? new Date(`${deliveredOn}T12:00:00.000Z`) : null,
+          createdAt: new Date(`${day}T08:30:00.000Z`),
+          lines: { create: lines.map((l, idx) => ({ ...l, lineTotal: totals.lineTotals[idx] })) },
+        },
+      });
+      orderCount++;
+      if (!deliveredOn) continue;
+
+      const dueDate = addDays(deliveredOn, customer.terms);
+      const invoice = await prisma.invoice.create({
+        data: {
+          organizationId,
+          invoiceNumber: docNo('INVOICE', 'INV'),
+          orderId: order.id,
+          customerId: customer.id,
+          issueDate: dateCol(deliveredOn),
+          dueDate: dateCol(dueDate),
+          vatRate: 18,
+          subtotal: totals.subtotal,
+          vatAmount: totals.vatAmount,
+          total: totals.total,
+          ebmReceiptNumber: rand() < 0.8 ? `EBM-${randInt(100000, 999999)}` : null,
+        },
+      });
+
+      // Cash customers pay on delivery; credit customers mostly pay near the due date,
+      // some pay part, and a few recent ones are still unpaid or overdue.
+      const pay = (amount: number, paidOn: string) =>
+        prisma.payment.create({
+          data: {
+            organizationId,
+            paymentNumber: docNo('PAYMENT', 'RCT'),
+            invoiceId: invoice.id,
+            customerId: customer.id,
+            amount,
+            method: customer.terms === 0 ? pick(['CASH', 'MTN_MOMO'] as PaymentMethod[]) : pick(methods),
+            reference: `TX${randInt(10000000, 99999999)}`,
+            paidOn: dateCol(paidOn > today ? today : paidOn),
+            receivedById: customer.terms === 0 ? userId('Gakuba Samson') : userId(repName),
+          },
+        });
+      const payRoll = rand();
+      if (customer.terms === 0) {
+        await pay(totals.total, deliveredOn);
+      } else if (dueDate < addDays(today, -45) || payRoll < 0.55) {
+        const paidOn = addDays(deliveredOn, randInt(5, customer.terms));
+        if (paidOn <= today) await pay(totals.total, paidOn);
+      } else if (payRoll < 0.75) {
+        await pay(Math.round(totals.total * 0.5), addDays(deliveredOn, 3));
+      }
     }
   }
-  await prisma.visitLog.createMany({ data: visits });
+  await prisma.documentSequence.createMany({
+    data: (Object.keys(seq) as DocumentType[]).map((type) => ({ organizationId, type, lastNumber: seq[type] })),
+  });
 
   // 10. Commission rules
   await prisma.commissionRule.createMany({
@@ -315,7 +501,7 @@ async function main() {
     },
   });
 
-  console.log(`✅ Seeded ${TEAM.length} users, ${customers.length} customers, ${DEALS.length} deals, ${visits.length} visits.`);
+  console.log(`✅ Seeded ${TEAM.length} users, ${customers.length} customers, ${DEALS.length} deals, ${visitCount} visits, ${orderCount} orders.`);
   console.log('   Log in with any seeded email (e.g. eric.m@gorillacoffee.rw) and SEED_USER_PASSWORD.');
 }
 

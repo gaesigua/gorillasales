@@ -79,3 +79,10 @@ export function parsePeriodParams(params: { month?: string; year?: string }) {
 export function monthLastDay(year: number, month: number): string {
   return new Date(Date.UTC(year, month + 1, 0)).toISOString().slice(0, 10);
 }
+
+/** YYYY-MM-DD shifted by a number of days. */
+export function addDaysToDate(date: string, days: number): string {
+  const d = stringToDateColumn(date);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}

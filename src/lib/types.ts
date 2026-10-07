@@ -1,19 +1,31 @@
 // UI-facing data shapes returned by the server data layer (src/lib/data) and server actions.
 import type { Role } from './roles';
 
-export type PaymentStatusValue = 'PAID' | 'CREDIT' | 'PENDING' | 'OVERDUE' | 'PARTIAL';
+export type OrderStatusValue = 'PENDING_APPROVAL' | 'CONFIRMED' | 'DELIVERED' | 'CANCELLED';
+export const ORDER_STATUS_LABELS: Record<OrderStatusValue, string> = {
+  PENDING_APPROVAL: 'Credit Hold',
+  CONFIRMED: 'Confirmed',
+  DELIVERED: 'Delivered',
+  CANCELLED: 'Cancelled',
+};
 
-export const PAYMENT_STATUS_OPTIONS: { value: PaymentStatusValue; label: string }[] = [
-  { value: 'PAID', label: 'Paid' },
-  { value: 'CREDIT', label: 'Credit' },
-  { value: 'PENDING', label: 'Pending' },
-  { value: 'PARTIAL', label: 'Partial' },
-  { value: 'OVERDUE', label: 'Overdue' },
-];
+export type PaymentMethodValue = 'CASH' | 'MTN_MOMO' | 'AIRTEL_MONEY' | 'BANK_TRANSFER' | 'CHEQUE';
+export const PAYMENT_METHOD_LABELS: Record<PaymentMethodValue, string> = {
+  CASH: 'Cash',
+  MTN_MOMO: 'MTN MoMo',
+  AIRTEL_MONEY: 'Airtel Money',
+  BANK_TRANSFER: 'Bank Transfer',
+  CHEQUE: 'Cheque',
+};
 
-export function paymentStatusLabel(value: string): string {
-  return PAYMENT_STATUS_OPTIONS.find((o) => o.value === value)?.label ?? value;
-}
+export type InvoiceStatusValue = 'PAID' | 'PARTIAL' | 'UNPAID' | 'OVERDUE' | 'VOID';
+export const INVOICE_STATUS_LABELS: Record<InvoiceStatusValue, string> = {
+  PAID: 'Paid',
+  PARTIAL: 'Part Paid',
+  UNPAID: 'Unpaid',
+  OVERDUE: 'Overdue',
+  VOID: 'Void',
+};
 
 export type CustomerTypeValue = 'NEW_CUSTOMER' | 'EXISTING_CUSTOMER';
 export const CUSTOMER_TYPE_LABELS: Record<CustomerTypeValue, string> = {
@@ -40,16 +52,120 @@ export interface VisitLog {
   area: string;
   customerCategory: string;
   visitOutcome: string;
-  productId?: string;
-  productCategory: string; // product name
-  quantity: number;
-  weightKg: number; // quantity × product unit weight
-  unitPrice: number;
-  salesValue: number;
-  paymentStatus: string; // label, e.g. "Paid"
+  // Order taken during this visit, if any (cancelled orders are ignored)
+  orderId?: string;
+  orderNumber?: string;
+  orderStatus?: OrderStatusValue;
+  productSummary: string; // e.g. "250G Roasted Coffee ×10, 1KG Roasted Coffee ×2"
+  salesValue: number; // order total incl. VAT, 0 when no order
+  weightKg: number; // coffee weight of the order
   customerType: string; // label, e.g. "Existing Customer"
   nextFollowUpDate: string;
   remarks: string;
+}
+
+export interface OrderLine {
+  id: string;
+  productId: string;
+  productName: string;
+  quantity: number;
+  unitPrice: number;
+  unitWeightKg: number;
+  lineTotal: number;
+}
+
+export interface Order {
+  id: string;
+  orderNumber: string;
+  orderDate: string;
+  status: OrderStatusValue;
+  customerId: string;
+  customerName: string;
+  area: string;
+  salespersonId: string;
+  salesperson: string;
+  visitLogId: string;
+  paymentTermsDays: number;
+  subtotal: number;
+  vatAmount: number;
+  total: number;
+  weightKg: number;
+  notes: string;
+  holdReason: string;
+  cancelReason: string;
+  lines: OrderLine[];
+  invoiceId: string;
+  invoiceNumber: string;
+  amountPaid: number; // payments on this order's invoice
+}
+
+export interface PaymentRecord {
+  id: string;
+  paymentNumber: string;
+  invoiceId: string;
+  invoiceNumber: string;
+  customerId: string;
+  customerName: string;
+  amount: number;
+  method: PaymentMethodValue;
+  reference: string;
+  paidOn: string;
+  receivedBy: string;
+  notes: string;
+}
+
+export interface Invoice {
+  id: string;
+  invoiceNumber: string;
+  orderId: string;
+  orderNumber: string;
+  customerId: string;
+  customerName: string;
+  customerTin: string;
+  salespersonId: string;
+  salesperson: string;
+  issueDate: string;
+  dueDate: string;
+  vatRate: number;
+  subtotal: number;
+  vatAmount: number;
+  total: number;
+  paid: number;
+  balance: number;
+  status: InvoiceStatusValue;
+  daysOverdue: number;
+  ebmReceiptNumber: string;
+  payments: PaymentRecord[];
+}
+
+export interface AgingTotals {
+  current: number;
+  d1_30: number;
+  d31_60: number;
+  d61_90: number;
+  d90_plus: number;
+  total: number;
+  overdue: number;
+}
+
+export interface PriceListItemDTO {
+  productId: string;
+  unitPrice: number;
+}
+
+export interface PriceListDTO {
+  id: string;
+  name: string;
+  description: string;
+  items: PriceListItemDTO[];
+  customerCount: number;
+}
+
+export interface OrganizationSettings {
+  name: string;
+  tin: string;
+  vatRate: number;
+  pricesIncludeVat: boolean;
 }
 
 export interface Customer {
@@ -74,8 +190,16 @@ export interface Customer {
   ordersThisMonth: number;
   lastOrderDate: string;
   remarks: string;
-  outstandingBalance: number;
+  tin: string;
+  province: string;
+  district: string;
+  sector: string;
+  priceListId: string;
+  paymentTermsDays: number; // 0 = cash on delivery
   creditLimit: number;
+  outstandingBalance: number; // unpaid invoices
+  overdueBalance: number; // unpaid invoices past due
+  openOrdersTotal: number; // confirmed/held orders not yet invoiced
 }
 
 export interface PipelineStage {
@@ -150,6 +274,8 @@ export interface SalespersonItem {
 
 /** Org-wide reference data used by forms and filters on every page. */
 export interface AppConfig {
+  settings: OrganizationSettings;
+  priceLists: { id: string; name: string }[];
   salespeople: SalespersonItem[];
   customerCategories: LookupItem[];
   visitOutcomes: LookupItem[];
@@ -189,7 +315,8 @@ export interface RepPerformanceRow {
   salesperson: string;
   target: number;
   targetWeightKg: number;
-  actualSales: number;
+  actualSales: number; // order value (excl. cancelled) by order date
+  actualWeightKg: number;
   achievementPct: number;
   newCustomers: number;
   customerVisits: number;
@@ -219,8 +346,25 @@ export interface DashboardData {
   today: string; // YYYY-MM-DD, Kigali
   month: number;
   year: number;
+  receivables: AgingTotals;
+  ordersOnHold: number;
+  ordersToDeliver: number;
   repRows: RepPerformanceRow[];
   trend: TrendPoint[];
   overdue: OverdueFollowUp[];
   openDeals: PipelineDeal[];
 }
+
+/** Minimal customer info for order/visit pickers. */
+export interface CustomerOption {
+  id: string;
+  name: string;
+  area: string;
+  category: string;
+  customerType: CustomerTypeValue;
+  priceListId: string | null;
+  paymentTermsDays: number;
+}
+
+/** priceListId -> productId -> unit price, for showing customer-specific prices in forms. */
+export type PriceBook = Record<string, Record<string, number>>;

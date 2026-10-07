@@ -32,7 +32,7 @@ Built with Next.js 15 (App Router, Server Actions), Prisma and PostgreSQL.
 4. Create the tables and load demo data:
 
    ```bash
-   npm run db:push
+   npm run db:deploy
    npm run db:seed
    ```
 
@@ -57,7 +57,9 @@ Built with Next.js 15 (App Router, Server Actions), Prisma and PostgreSQL.
 | `npm run build` | Production build (fails on type errors) |
 | `npm start` | Run the production build |
 | `npm run type-check` | TypeScript check |
-| `npm run db:push` | Sync the Prisma schema to the database |
+| `npm test` | Unit tests (VAT, credit control, aging, commission) |
+| `npm run db:migrate` | Create a migration after changing `prisma/schema.prisma` (development) |
+| `npm run db:deploy` | Apply pending migrations (use this in production) |
 | `npm run db:seed` | Load demo data |
 | `npm run db:studio` | Browse the database |
 
@@ -73,11 +75,39 @@ src/lib/tenant.ts    Session validation, role checks and per-user data scoping
 src/lib/types.ts     Shapes shared between server and UI
 ```
 
+## Upgrading a database created with `db push`
+
+Databases created before migrations were introduced need a one-time baseline, then the
+normal deploy:
+
+```bash
+npx prisma migrate resolve --applied 0_init
+npm run db:deploy
+```
+
+The Phase 2 migration converts each historical visit that recorded a sale into a delivered
+order with an invoice (and a cash payment if the visit was marked Paid).
+
+## Order-to-cash flow
+
+1. A rep places an order (from a visit or the Orders screen). Prices come from the customer's
+   price list; only managers can change prices.
+2. Credit check: orders for customers with overdue invoices, or that would take a credit
+   customer over their limit, go on **credit hold** until a manager approves them.
+   Cash-on-delivery customers are not limited by a credit amount.
+3. Delivery staff mark the order delivered. This issues the invoice (VAT backed out of
+   VAT-inclusive prices; due after the customer's payment terms) and can record payment
+   collected on delivery.
+4. Payments (cash, MTN MoMo, Airtel Money, bank, cheque) are recorded against invoices.
+   Balances and aging are always calculated from invoices and payments.
+
 ## Access rules
 
 - **Admins and managers** see all reps' data and can change configuration and users.
   Only admins can manage admin accounts.
-- **Sales officers** see only their own visits and deals, plus their own and unassigned
-  customers. Visits they log are always recorded under their own name.
+- **Sales officers** see only their own visits, deals, orders and invoices, plus their own and
+  unassigned customers. Visits and orders they create are always recorded under their own name.
+- **Delivery support and drivers** see all orders and invoices, mark orders delivered and
+  record payments.
 - Deactivating a user or resetting their password signs them out everywhere immediately.
 - Every change is recorded in the `audit_logs` table.

@@ -89,3 +89,26 @@ export function customerScope(session: UserSession): Prisma.CustomerWhereInput {
   if (canViewAllReps(session)) return base;
   return { ...base, OR: [{ salespersonId: session.userId }, { salespersonId: null }] };
 }
+
+/** Roles that see every order and invoice: managers plus the staff who deliver and collect. */
+const ORDER_WIDE_ROLES: Role[] = ['ADMIN', 'MANAGER', 'DELIVERY_SUPPORT', 'DRIVER'];
+
+export function canViewAllOrders(session: UserSession): boolean {
+  return ORDER_WIDE_ROLES.includes(session.role);
+}
+
+/** Orders a session may see: sales officers only their own. */
+export function orderScope(session: UserSession): Prisma.SalesOrderWhereInput {
+  return {
+    organizationId: session.organizationId,
+    ...(canViewAllOrders(session) ? {} : { salespersonId: session.userId }),
+  };
+}
+
+/** Invoices a session may see: sales officers only those for their own orders. */
+export function invoiceScope(session: UserSession): Prisma.InvoiceWhereInput {
+  return {
+    organizationId: session.organizationId,
+    ...(canViewAllOrders(session) ? {} : { order: { salespersonId: session.userId } }),
+  };
+}

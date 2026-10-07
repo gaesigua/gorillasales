@@ -10,23 +10,18 @@ import { useUser } from '@/context/UserContext';
 import { useConfig } from '@/context/ConfigContext';
 import { deleteVisitLog } from '@/actions/visits';
 import { isOrder } from '@/lib/visitRules';
-import type { CustomerTypeValue, VisitLog } from '@/lib/types';
+import type { CustomerOption, PriceBook, VisitLog } from '@/lib/types';
 
-export interface CustomerOption {
-  id: string;
-  name: string;
-  area: string;
-  category: string;
-  customerType: CustomerTypeValue;
-}
+export type { CustomerOption, PriceBook };
 
 interface DailySalesEntryClientProps {
   visits: VisitLog[];
   customers: CustomerOption[];
+  priceBook: PriceBook;
   today: string;
 }
 
-export default function DailySalesEntryClient({ visits, customers, today }: DailySalesEntryClientProps) {
+export default function DailySalesEntryClient({ visits, customers, priceBook, today }: DailySalesEntryClientProps) {
   const router = useRouter();
   const { currentUser, canViewAllReps } = useUser();
   const { config } = useConfig();
@@ -128,7 +123,7 @@ export default function DailySalesEntryClient({ visits, customers, today }: Dail
           <div className="w-1 h-5 bg-accent rounded-full" />
           <h2 className="text-base font-semibold text-foreground">Log New Visit</h2>
         </div>
-        <SalesEntryForm customers={customers} today={today} />
+        <SalesEntryForm customers={customers} priceBook={priceBook} today={today} />
       </div>
 
       {/* Recent entries table */}

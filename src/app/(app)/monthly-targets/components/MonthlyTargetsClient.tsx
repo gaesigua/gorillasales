@@ -5,9 +5,10 @@ import { useRouter } from 'next/navigation';
 import { Target, AlertCircle, ChevronDown, Users, CheckCircle2, XCircle, Clock, Download, FileText } from 'lucide-react';
 import { formatRWF } from '@/lib/format';
 import { MONTH_LONG as MONTHS } from '@/lib/dates';
-import { needsFollowUp, isOrder } from '@/lib/visitRules';
+import { needsFollowUp } from '@/lib/visitRules';
 import { useUser } from '@/context/UserContext';
-import type { RepMonthlyTarget, SalespersonItem, VisitLog } from '@/lib/types';
+import { calculateCommission } from '@/lib/domain/commission';
+import type { CommissionRule, Order, RepMonthlyTarget, SalespersonItem, VisitLog } from '@/lib/types';
 
 // Per-rep monthly targets are managed via Admin Config → Monthly Targets tab
 
@@ -23,34 +24,56 @@ interface RepPerf {
   orders: number;
   visits: number;
   outstandingFollowUps: number;
-  paidSales: number;
-  creditSales: number;
+  paidSales: number; // collected on this month's orders
+  creditSales: number; // invoiced but not yet paid
+  commission: number;
 }
 
-/** Per-rep performance for one month, from that month's visits and targets. */
-function buildMonthlyPerf(reps: SalespersonItem[], visits: VisitLog[], targets: RepMonthlyTarget[]): RepPerf[] {
-  // Include reps who are no longer active but still have visits or targets this month
+/** Per-rep performance for one month: sales from orders, activity from visits. */
+function buildMonthlyPerf(
+  reps: SalespersonItem[],
+  visits: VisitLog[],
+  orders: Order[],
+  targets: RepMonthlyTarget[],
+  rules: CommissionRule[]
+): RepPerf[] {
+  // Include reps who are no longer active but still have activity or targets this month
   const repMap = new Map(reps.map((r) => [r.id, r.label]));
   visits.forEach((v) => repMap.set(v.salespersonId, v.salesperson));
+  orders.forEach((o) => repMap.set(o.salespersonId, o.salesperson));
   targets.forEach((t) => repMap.set(t.salespersonId, t.repName));
 
   return [...repMap.entries()].map(([id, name]) => {
-    const repLogs = visits.filter((v) => v.salespersonId === id);
+    const repVisits = visits.filter((v) => v.salespersonId === id);
+    const repOrders = orders.filter((o) => o.salespersonId === id);
     const repTarget = targets.find((t) => t.salespersonId === id);
 
-    const actualSales = repLogs.reduce((s, v) => s + v.salesValue, 0);
-    const actualKg = Math.round(repLogs.reduce((s, v) => s + v.weightKg, 0) * 100) / 100;
-    const orders = repLogs.filter(isOrder).length;
-    const visitCount = repLogs.length;
-    const outstandingFollowUps = repLogs.filter(needsFollowUp).length;
-    const paidSales = repLogs.filter((v) => v.paymentStatus === 'Paid').reduce((s, v) => s + v.salesValue, 0);
-    const creditSales = repLogs.filter((v) => v.paymentStatus === 'Credit').reduce((s, v) => s + v.salesValue, 0);
+    const actualSales = repOrders.reduce((s, o) => s + o.total, 0);
+    const actualKg = Math.round(repOrders.reduce((s, o) => s + o.weightKg, 0) * 100) / 100;
+    const paidSales = repOrders.reduce((s, o) => s + o.amountPaid, 0);
+    const creditSales = repOrders.filter((o) => o.invoiceId).reduce((s, o) => s + (o.total - o.amountPaid), 0);
     const target = repTarget?.targetAmount ?? 0;
     const targetKg = repTarget?.targetWeightKg ?? 0;
     const achievementPct = target > 0 ? Math.round((actualSales / target) * 100 * 10) / 10 : 0;
     const achievementKgPct = targetKg > 0 ? Math.round((actualKg / targetKg) * 100 * 10) / 10 : 0;
+    const commission = calculateCommission(rules, actualSales, target).total;
 
-    return { id, name, target, targetKg, actualSales, actualKg, achievementPct, achievementKgPct, orders, visits: visitCount, outstandingFollowUps, paidSales, creditSales };
+    return {
+      id,
+      name,
+      target,
+      targetKg,
+      actualSales,
+      actualKg,
+      achievementPct,
+      achievementKgPct,
+      orders: repOrders.length,
+      visits: repVisits.length,
+      outstandingFollowUps: repVisits.filter(needsFollowUp).length,
+      paidSales,
+      creditSales,
+      commission,
+    };
   });
 }
 
@@ -78,10 +101,12 @@ interface MonthlyTargetsClientProps {
   years: number[];
   reps: SalespersonItem[];
   visits: VisitLog[];
+  orders: Order[];
   targets: RepMonthlyTarget[];
+  commissionRules: CommissionRule[];
 }
 
-export default function MonthlyTargetsClient({ month, year, years, reps, visits, targets }: MonthlyTargetsClientProps) {
+export default function MonthlyTargetsClient({ month, year, years, reps, visits, orders, targets, commissionRules }: MonthlyTargetsClientProps) {
   const router = useRouter();
   const { currentUser, canViewAllReps } = useUser();
   const selectedMonth = month;
@@ -90,7 +115,10 @@ export default function MonthlyTargetsClient({ month, year, years, reps, visits,
 
   const selectPeriod = (m: number, y: number) => router.push(`/monthly-targets?month=${m}&year=${y}`);
 
-  const perfData = useMemo(() => buildMonthlyPerf(reps, visits, targets), [reps, visits, targets]);
+  const perfData = useMemo(
+    () => buildMonthlyPerf(reps, visits, orders, targets, commissionRules),
+    [reps, visits, orders, targets, commissionRules]
+  );
 
   // The server only sends a sales officer their own visits and targets
   const visibleData = canViewAllReps ? perfData : perfData.filter((r) => r.id === currentUser.id);
@@ -107,14 +135,14 @@ export default function MonthlyTargetsClient({ month, year, years, reps, visits,
 
   function handleDownloadCSV() {
     const rows = [
-      ['Officer', 'Target (RWF)', 'Target (KG)', 'Actual Sales (RWF)', 'Actual (KG)', 'Achievement % (RWF)', 'Achievement % (KG)', 'Orders', 'Visits', 'Follow-ups', 'Paid (RWF)', 'Credit (RWF)'],
+      ['Officer', 'Target (RWF)', 'Target (KG)', 'Actual Sales (RWF)', 'Actual (KG)', 'Achievement % (RWF)', 'Achievement % (KG)', 'Orders', 'Visits', 'Follow-ups', 'Collected (RWF)', 'Unpaid (RWF)', 'Commission (RWF)'],
       ...visibleData.map((r) => [
-        r.name, r.target, r.targetKg, r.actualSales, r.actualKg, r.achievementPct, r.achievementKgPct, r.orders, r.visits, r.outstandingFollowUps, r.paidSales, r.creditSales,
+        r.name, r.target, r.targetKg, r.actualSales, r.actualKg, r.achievementPct, r.achievementKgPct, r.orders, r.visits, r.outstandingFollowUps, r.paidSales, r.creditSales, r.commission,
       ]),
     ];
     if (canViewAllReps) {
       rows.push([]);
-      rows.push(['TEAM TOTAL', teamTarget, teamTargetKg, teamActual, teamActualKg, teamAchievement, teamAchievementKg, teamOrders, perfData.reduce((s, r) => s + r.visits, 0), teamFollowUps, perfData.reduce((s, r) => s + r.paidSales, 0), perfData.reduce((s, r) => s + r.creditSales, 0)]);
+      rows.push(['TEAM TOTAL', teamTarget, teamTargetKg, teamActual, teamActualKg, teamAchievement, teamAchievementKg, teamOrders, perfData.reduce((s, r) => s + r.visits, 0), teamFollowUps, perfData.reduce((s, r) => s + r.paidSales, 0), perfData.reduce((s, r) => s + r.creditSales, 0), perfData.reduce((s, r) => s + r.commission, 0)]);
     }
     const csv = rows.map((r) => r.join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
@@ -315,12 +343,13 @@ export default function MonthlyTargetsClient({ month, year, years, reps, visits,
                 <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Orders</th>
                 <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Visits</th>
                 <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Follow-ups</th>
+                <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Commission</th>
               </tr>
             </thead>
             <tbody>
               {visibleData.length === 0 && (
                 <tr>
-                  <td colSpan={10} className="text-center py-10 text-muted-foreground text-sm">
+                  <td colSpan={11} className="text-center py-10 text-muted-foreground text-sm">
                     No data for this period.
                   </td>
                 </tr>
@@ -391,6 +420,9 @@ export default function MonthlyTargetsClient({ month, year, years, reps, visits,
                         <span className="text-xs text-green-600 font-semibold">—</span>
                       )}
                     </td>
+                    <td className="px-4 py-3 text-right font-tabular font-semibold text-foreground">
+                      {formatRWF(rep.commission)}
+                    </td>
                   </tr>
                 );
               })}
@@ -434,6 +466,9 @@ export default function MonthlyTargetsClient({ month, year, years, reps, visits,
                     ) : (
                       <span className="text-xs text-green-600 font-semibold">—</span>
                     )}
+                  </td>
+                  <td className="px-4 py-3 text-right font-tabular font-bold text-foreground">
+                    {formatRWF(perfData.reduce((s, r) => s + r.commission, 0))}
                   </td>
                 </tr>
               </tfoot>

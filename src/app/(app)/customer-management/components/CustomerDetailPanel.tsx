@@ -12,6 +12,7 @@ import Badge from '@/components/ui/Badge';
 interface CustomerDetailPanelProps {
   customer: Customer | null;
   onClose: () => void;
+  onEdit: (customer: Customer) => void;
 }
 
 function getStatusVariant(status: string) {
@@ -20,7 +21,7 @@ function getStatusVariant(status: string) {
   return 'info';
 }
 
-export default function CustomerDetailPanel({ customer, onClose }: CustomerDetailPanelProps) {
+export default function CustomerDetailPanel({ customer, onClose, onEdit }: CustomerDetailPanelProps) {
   const [customerVisits, setCustomerVisits] = useState<VisitLog[]>([]);
   const [visitsError, setVisitsError] = useState('');
   const customerId = customer?.id;
@@ -114,6 +115,43 @@ export default function CustomerDetailPanel({ customer, onClose }: CustomerDetai
               <span className="text-muted-foreground">Owner:</span>
               <span className="text-foreground">{customer.salesperson || 'Unassigned'}</span>
             </div>
+          </div>
+
+          {/* Account & credit */}
+          <div className="bg-muted/40 rounded-xl p-4 space-y-2 text-sm">
+            <h4 className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground mb-1">
+              Account &amp; Credit
+            </h4>
+            {[
+              ['TIN', customer.tin || '—'],
+              ['Address', [customer.sector, customer.district, customer.province].filter(Boolean).join(', ') || '—'],
+              ['Payment terms', customer.paymentTermsDays > 0 ? `${customer.paymentTermsDays} days` : 'Cash on delivery'],
+              ['Credit limit', customer.paymentTermsDays > 0 ? formatRWFFull(customer.creditLimit) : '—'],
+              ['Outstanding', formatRWFFull(customer.outstandingBalance)],
+              ['Open orders (not delivered)', formatRWFFull(customer.openOrdersTotal)],
+            ].map(([label, value]) => (
+              <div key={label} className="flex justify-between gap-4">
+                <span className="text-muted-foreground">{label}</span>
+                <span className="text-foreground font-tabular text-right">{value}</span>
+              </div>
+            ))}
+            <div className="flex justify-between gap-4">
+              <span className="text-muted-foreground">Overdue</span>
+              <span className={`font-tabular font-semibold ${customer.overdueBalance > 0 ? 'text-negative' : 'text-foreground'}`}>
+                {formatRWFFull(customer.overdueBalance)}
+              </span>
+            </div>
+            {customer.paymentTermsDays > 0 && (
+              <div className="flex justify-between gap-4 border-t border-border pt-2">
+                <span className="text-muted-foreground">Available credit</span>
+                <span className="font-tabular font-semibold">
+                  {formatRWFFull(Math.max(0, customer.creditLimit - customer.outstandingBalance - customer.openOrdersTotal))}
+                </span>
+              </div>
+            )}
+            <Link href={`/receivables?customer=${customer.id}`} className="block text-xs text-accent underline pt-1">
+              View invoices &amp; payments
+            </Link>
           </div>
 
           {/* Health metrics */}
@@ -222,7 +260,7 @@ export default function CustomerDetailPanel({ customer, onClose }: CustomerDetai
                           <p className="text-xs font-semibold text-foreground font-tabular">
                             {formatRWFFull(v.salesValue)}
                             <span className="text-muted-foreground font-normal ml-1">
-                              · {v.productCategory}
+                              · {v.orderNumber} · {v.productSummary}
                             </span>
                           </p>
                         )}
@@ -246,8 +284,20 @@ export default function CustomerDetailPanel({ customer, onClose }: CustomerDetai
             href="/daily-sales-entry"
             className="flex-1 text-center bg-primary text-primary-foreground text-sm font-semibold py-2 rounded-lg hover:bg-primary/90 transition-colors active:scale-95"
           >
-            Log New Visit
+            Log Visit
           </Link>
+          <Link
+            href={`/orders?new=${customer.id}`}
+            className="flex-1 text-center border border-border text-sm font-semibold py-2 rounded-lg hover:bg-muted transition-colors"
+          >
+            New Order
+          </Link>
+          <button
+            onClick={() => onEdit(customer)}
+            className="px-4 py-2 text-sm font-medium text-muted-foreground border border-border rounded-lg hover:bg-muted transition-colors"
+          >
+            Edit
+          </button>
         </div>
       </div>
     </div>

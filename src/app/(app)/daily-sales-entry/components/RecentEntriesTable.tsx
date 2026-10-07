@@ -4,7 +4,8 @@ import React, { useState } from 'react';
 import { Trash2, Eye, ChevronUp, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { formatRWFFull } from '@/lib/format';
 import { isOrder, needsFollowUp } from '@/lib/visitRules';
-import type { VisitLog } from '@/lib/types';
+import Link from 'next/link';
+import { ORDER_STATUS_LABELS, type OrderStatusValue, type VisitLog } from '@/lib/types';
 import Badge from '@/components/ui/Badge';
 
 interface RecentEntriesTableProps {
@@ -21,11 +22,9 @@ function getOutcomeBadge(entry: VisitLog) {
   return <Badge label={entry.visitOutcome} variant="neutral" dot />;
 }
 
-function getPaymentBadge(status: string) {
-  if (status === 'Paid') return <Badge label="Paid" variant="success" />;
-  if (status === 'Credit') return <Badge label="Credit" variant="info" />;
-  if (status === 'Pending') return <Badge label="Pending" variant="warning" />;
-  return <Badge label={status} variant="neutral" />;
+function getOrderBadge(status: OrderStatusValue) {
+  const variant = status === 'DELIVERED' ? 'success' : status === 'PENDING_APPROVAL' ? 'warning' : status === 'CANCELLED' ? 'error' : 'info';
+  return <Badge label={ORDER_STATUS_LABELS[status]} variant={variant} />;
 }
 
 const PAGE_SIZE = 5;
@@ -122,11 +121,10 @@ export default function RecentEntriesTable({ entries, onDelete, canDelete }: Rec
                   { key: 'customerName', label: 'Customer' },
                   { key: 'area', label: 'Area' },
                   { key: 'visitOutcome', label: 'Outcome' },
-                  { key: 'productCategory', label: 'Product' },
-                  { key: 'quantity', label: 'Qty' },
-                  { key: 'unitPrice', label: 'Unit Price' },
-                  { key: 'salesValue', label: 'Sales Value' },
-                  { key: 'paymentStatus', label: 'Payment' },
+                  { key: 'orderNumber', label: 'Order' },
+                  { key: 'productSummary', label: 'Products' },
+                  { key: 'salesValue', label: 'Order Value' },
+                  { key: 'orderStatus', label: 'Order Status' },
                   { key: 'customerType', label: 'Type' },
                   { key: 'nextFollowUpDate', label: 'Follow-up' },
                 ] as { key: SortKey; label: string }[]
@@ -170,20 +168,23 @@ export default function RecentEntriesTable({ entries, onDelete, canDelete }: Rec
                 <td className="px-3 py-3 whitespace-nowrap">
                   {getOutcomeBadge(entry)}
                 </td>
-                <td className="px-3 py-3 text-sm text-muted-foreground max-w-[140px] truncate whitespace-nowrap">
-                  {entry.productCategory || '—'}
+                <td className="px-3 py-3 text-sm font-mono whitespace-nowrap">
+                  {entry.orderNumber ? (
+                    <Link href={`/orders?q=${entry.orderNumber}`} className="underline hover:text-accent">
+                      {entry.orderNumber}
+                    </Link>
+                  ) : (
+                    '—'
+                  )}
                 </td>
-                <td className="px-3 py-3 text-sm text-foreground font-tabular text-right">
-                  {entry.quantity || '—'}
-                </td>
-                <td className="px-3 py-3 text-sm text-muted-foreground font-tabular whitespace-nowrap text-right">
-                  {entry.unitPrice > 0 ? `RWF ${entry.unitPrice.toLocaleString()}` : '—'}
+                <td className="px-3 py-3 text-sm text-muted-foreground max-w-[220px] truncate whitespace-nowrap" title={entry.productSummary}>
+                  {entry.productSummary || '—'}
                 </td>
                 <td className="px-3 py-3 text-sm font-semibold text-foreground font-tabular whitespace-nowrap text-right">
                   {entry.salesValue > 0 ? formatRWFFull(entry.salesValue) : '—'}
                 </td>
                 <td className="px-3 py-3 whitespace-nowrap">
-                  {entry.paymentStatus ? getPaymentBadge(entry.paymentStatus) : <span className="text-muted-foreground text-xs">—</span>}
+                  {entry.orderStatus ? getOrderBadge(entry.orderStatus) : <span className="text-muted-foreground text-xs">—</span>}
                 </td>
                 <td className="px-3 py-3 whitespace-nowrap">
                   {entry.customerType === 'New Customer' ? (

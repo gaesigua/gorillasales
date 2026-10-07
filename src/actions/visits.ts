@@ -6,9 +6,10 @@ import { prisma } from '@/lib/prisma';
 import { canViewAllReps, customerScope, requireSession, scopedSalespersonId } from '@/lib/tenant';
 import { audit } from '@/lib/audit';
 import { runAction, UserFacingError } from '@/lib/actionUtils';
-import { stringToDateColumn } from '@/lib/dates';
+import { stringToDateColumn, todayKigali } from '@/lib/dates';
 import { listVisits, toVisitDTO, visitInclude } from '@/lib/data/visits';
-import type { ActionResult, PaymentStatusValue, VisitLog } from '@/lib/types';
+import { orderLinesSchema, placeOrder } from '@/lib/orderService';
+import type { ActionResult, VisitLog } from '@/lib/types';
 
 const dateString = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date');
 
@@ -17,74 +18,75 @@ const createVisitSchema = z.object({
   customerId: z.string().min(1, 'Select a customer'),
   dateOfVisit: dateString,
   visitOutcome: z.string().trim().min(1, 'Select an outcome').max(120),
-  productId: z.string().optional(),
-  quantity: z.coerce.number().min(0).default(0),
-  unitPrice: z.coerce.number().min(0).default(0),
-  paymentStatus: z.enum(['PAID', 'CREDIT', 'PENDING', 'OVERDUE', 'PARTIAL']).default('PENDING'),
   nextFollowUpDate: dateString.optional().or(z.literal('')),
   remarks: z.string().trim().max(2000).optional(),
+  // Products ordered during the visit; omitted or empty when no order was taken
+  orderLines: orderLinesSchema.optional(),
+  orderNotes: z.string().trim().max(2000).optional(),
 });
 
-export interface CreateVisitInput {
-  salespersonId?: string;
-  customerId: string;
-  dateOfVisit: string;
-  visitOutcome: string;
-  productId?: string;
-  quantity: number;
-  unitPrice: number;
-  paymentStatus: PaymentStatusValue;
-  nextFollowUpDate?: string;
-  remarks?: string;
-}
+export type CreateVisitInput = z.input<typeof createVisitSchema>;
 
 /**
- * Record a new sales visit. Sales officers always log as themselves; managers may log
- * on behalf of a rep in their organization.
+ * Record a sales visit, plus the order taken during it if any. Sales officers always log as
+ * themselves; managers may log on behalf of a rep in their organization.
  */
 export async function createVisitLog(input: CreateVisitInput): Promise<ActionResult<VisitLog>> {
   return runAction('createVisitLog', async () => {
     const session = await requireSession();
     const { organizationId } = session;
-    const data = createVisitSchema.parse(input);
+    const data = createVisitSchema.parse({ ...input, orderLines: input.orderLines?.length ? input.orderLines : undefined });
+    if (data.dateOfVisit > todayKigali()) throw new UserFacingError('Visit date cannot be in the future.');
 
     const salespersonId = scopedSalespersonId(session, data.salespersonId) || session.userId;
-    const productId = data.productId || undefined;
-    const [rep, customer, product] = await Promise.all([
+    const [rep, customer] = await Promise.all([
       prisma.user.findFirst({ where: { id: salespersonId, organizationId }, select: { id: true } }),
       prisma.customer.findFirst({ where: { id: data.customerId, ...customerScope(session) }, select: { id: true } }),
-      productId
-        ? prisma.product.findFirst({ where: { id: productId, organizationId }, select: { id: true } })
-        : Promise.resolve(null),
     ]);
     if (!rep) throw new UserFacingError('Salesperson not found.');
     if (!customer) throw new UserFacingError('Customer not found.');
-    if (productId && !product) throw new UserFacingError('Product not found.');
-    if (data.quantity > 0 && !productId) throw new UserFacingError('Select the product sold.');
 
-    const visit = await prisma.visitLog.create({
-      data: {
-        organizationId,
-        salespersonId,
-        customerId: data.customerId,
-        dateOfVisit: stringToDateColumn(data.dateOfVisit),
-        visitOutcome: data.visitOutcome,
-        productId,
-        quantity: data.quantity,
-        unitPrice: data.unitPrice,
-        salesValue: data.quantity * data.unitPrice,
-        paymentStatus: data.paymentStatus,
-        nextFollowUpDate: data.nextFollowUpDate ? stringToDateColumn(data.nextFollowUpDate) : null,
-        remarks: data.remarks || null,
-      },
-      include: visitInclude,
+    const { visitId, order } = await prisma.$transaction(async (tx) => {
+      const visit = await tx.visitLog.create({
+        data: {
+          organizationId,
+          salespersonId,
+          customerId: data.customerId,
+          dateOfVisit: stringToDateColumn(data.dateOfVisit),
+          visitOutcome: data.visitOutcome,
+          nextFollowUpDate: data.nextFollowUpDate ? stringToDateColumn(data.nextFollowUpDate) : null,
+          remarks: data.remarks || null,
+        },
+      });
+      const placed = data.orderLines
+        ? await placeOrder(
+            tx,
+            session,
+            {
+              customerId: data.customerId,
+              salespersonId,
+              orderDate: data.dateOfVisit,
+              lines: data.orderLines,
+              notes: data.orderNotes,
+            },
+            visit.id
+          )
+        : null;
+      return { visitId: visit.id, order: placed };
     });
 
-    await audit(session, 'CREATE_VISIT_LOG', 'VisitLog', visit.id, {
-      customerId: visit.customerId,
-      salesValue: visit.salesValue,
-    });
+    await audit(session, 'CREATE_VISIT_LOG', 'VisitLog', visitId, { customerId: data.customerId, orderId: order?.id });
+    if (order) {
+      await audit(session, 'CREATE_ORDER', 'SalesOrder', order.id, {
+        orderNumber: order.orderNumber,
+        total: order.total,
+        status: order.status,
+        holdReason: order.holdReason,
+        visitLogId: visitId,
+      });
+    }
     revalidatePath('/', 'layout');
+    const visit = await prisma.visitLog.findUniqueOrThrow({ where: { id: visitId }, include: visitInclude });
     return toVisitDTO(visit);
   });
 }
@@ -99,14 +101,18 @@ export async function deleteVisitLog(visitId: string): Promise<ActionResult> {
         organizationId: session.organizationId,
         ...(canViewAllReps(session) ? {} : { salespersonId: session.userId }),
       },
+      include: { order: { select: { id: true, orderNumber: true, status: true } } },
     });
     if (!visit) throw new UserFacingError('Visit not found.');
+    if (visit.order && visit.order.status !== 'CANCELLED') {
+      throw new UserFacingError(`This visit has order ${visit.order.orderNumber}. Cancel the order before deleting the visit.`);
+    }
 
     await prisma.visitLog.delete({ where: { id: visit.id } });
     await audit(session, 'DELETE_VISIT_LOG', 'VisitLog', visit.id, {
       customerId: visit.customerId,
       dateOfVisit: visit.dateOfVisit,
-      salesValue: visit.salesValue,
+      orderId: visit.order?.id,
     });
     revalidatePath('/', 'layout');
     return undefined;

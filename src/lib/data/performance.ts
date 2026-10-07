@@ -1,8 +1,10 @@
 import 'server-only';
 
+import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import type { UserSession } from '@/lib/auth';
-import { scopedSalespersonId } from '@/lib/tenant';
+import { orderScope, scopedSalespersonId } from '@/lib/tenant';
+import { toNumber } from '@/lib/domain/money';
 import {
   currentKigaliMonth,
   dateColumnToString,
@@ -14,6 +16,7 @@ import {
 } from '@/lib/dates';
 import type { DashboardData, OverdueFollowUp, RepPerformanceRow, TrendPoint } from '@/lib/types';
 import { listDeals } from './deals';
+import { agingOf, listInvoices } from './receivables';
 
 /**
  * Customers whose most recent visit scheduled a follow-up that is due today or earlier.
@@ -63,7 +66,10 @@ export async function getRepPerformance(
   const repWhere = repId ? { salespersonId: repId } : {};
   const dateOfVisit = monthDateRange(year, month);
 
-  const [reps, targets, sales, orders, newCustomers, overdueList] = await Promise.all([
+  const orderDate = dateOfVisit;
+  const activeOrders: Prisma.SalesOrderWhereInput = { organizationId, orderDate, status: { not: 'CANCELLED' }, ...repWhere };
+
+  const [reps, targets, sales, visits, kgRows, newCustomers, overdueList] = await Promise.all([
     prisma.user.findMany({
       where: {
         organizationId,
@@ -71,6 +77,7 @@ export async function getRepPerformance(
         OR: [
           { role: 'SALES_OFFICER', isActive: true },
           { visitLogs: { some: { dateOfVisit } } },
+          { salesOrders: { some: { orderDate } } },
           { targets: { some: { year, month } } },
         ],
       },
@@ -78,17 +85,15 @@ export async function getRepPerformance(
       orderBy: { name: 'asc' },
     }),
     prisma.monthlyTarget.findMany({ where: { organizationId, year, month, ...repWhere } }),
-    prisma.visitLog.groupBy({
-      by: ['salespersonId'],
-      where: { organizationId, dateOfVisit, ...repWhere },
-      _sum: { salesValue: true },
-      _count: { _all: true },
-    }),
-    prisma.visitLog.groupBy({
-      by: ['salespersonId'],
-      where: { organizationId, dateOfVisit, salesValue: { gt: 0 }, ...repWhere },
-      _count: { _all: true },
-    }),
+    prisma.salesOrder.groupBy({ by: ['salespersonId'], where: activeOrders, _sum: { total: true }, _count: { _all: true } }),
+    prisma.visitLog.groupBy({ by: ['salespersonId'], where: { organizationId, dateOfVisit, ...repWhere }, _count: { _all: true } }),
+    prisma.$queryRaw<{ salespersonId: string; kg: number | null }[]>`
+      SELECT o."salespersonId", SUM(l."quantity" * l."unitWeightKg")::float AS kg
+      FROM "sales_order_lines" l JOIN "sales_orders" o ON o."id" = l."orderId"
+      WHERE o."organizationId" = ${organizationId} AND o."status" <> 'CANCELLED'
+        AND o."orderDate" >= ${orderDate.gte} AND o."orderDate" < ${orderDate.lt}
+        ${repId ? Prisma.sql`AND o."salespersonId" = ${repId}` : Prisma.empty}
+      GROUP BY o."salespersonId"`,
     prisma.customer.groupBy({
       by: ['salespersonId'],
       where: { organizationId, createdAt: monthInstantRange(year, month), ...repWhere },
@@ -100,18 +105,19 @@ export async function getRepPerformance(
   return reps.map((rep) => {
     const target = targets.find((t) => t.salespersonId === rep.id);
     const sale = sales.find((s) => s.salespersonId === rep.id);
-    const actualSales = sale?._sum.salesValue ?? 0;
-    const targetAmount = target?.targetAmount ?? 0;
+    const actualSales = toNumber(sale?._sum.total);
+    const targetAmount = toNumber(target?.targetAmount);
     return {
       salespersonId: rep.id,
       salesperson: rep.name,
       target: targetAmount,
       targetWeightKg: target?.targetWeightKg ?? 0,
       actualSales,
+      actualWeightKg: Math.round((kgRows.find((k) => k.salespersonId === rep.id)?.kg ?? 0) * 100) / 100,
       achievementPct: targetAmount > 0 ? Math.round((actualSales / targetAmount) * 1000) / 10 : 0,
       newCustomers: newCustomers.find((c) => c.salespersonId === rep.id)?._count._all ?? 0,
-      customerVisits: sale?._count._all ?? 0,
-      orders: orders.find((o) => o.salespersonId === rep.id)?._count._all ?? 0,
+      customerVisits: visits.find((v) => v.salespersonId === rep.id)?._count._all ?? 0,
+      orders: sale?._count._all ?? 0,
       outstandingFollowUps: overdueList.filter((f) => f.salespersonId === rep.id).length,
     };
   });
@@ -130,9 +136,9 @@ async function getSalesTrend(session: UserSession, year: number, month: number):
   return Promise.all(
     months.map(async (m) => {
       const [actual, target] = await Promise.all([
-        prisma.visitLog.aggregate({
-          where: { organizationId, dateOfVisit: monthDateRange(m.year, m.month), ...repWhere },
-          _sum: { salesValue: true },
+        prisma.salesOrder.aggregate({
+          where: { organizationId, orderDate: monthDateRange(m.year, m.month), status: { not: 'CANCELLED' }, ...repWhere },
+          _sum: { total: true },
         }),
         prisma.monthlyTarget.aggregate({
           where: { organizationId, year: m.year, month: m.month, ...repWhere },
@@ -141,8 +147,8 @@ async function getSalesTrend(session: UserSession, year: number, month: number):
       ]);
       return {
         month: `${MONTH_SHORT[m.month]} ${String(m.year).slice(2)}`,
-        target: target._sum.targetAmount ?? 0,
-        actual: actual._sum.salesValue ?? 0,
+        target: toNumber(target._sum.targetAmount),
+        actual: toNumber(actual._sum.total),
       };
     })
   );
@@ -151,15 +157,26 @@ async function getSalesTrend(session: UserSession, year: number, month: number):
 export async function getDashboardData(session: UserSession): Promise<DashboardData> {
   const { month, year } = currentKigaliMonth();
   const overdue = await listOverdueFollowUps(session);
-  const [repRows, trend, deals] = await Promise.all([
+  const today = todayKigali();
+  const [repRows, trend, deals, openInvoices, orderCounts] = await Promise.all([
     getRepPerformance(session, year, month, overdue),
     getSalesTrend(session, year, month),
     listDeals(session),
+    listInvoices(session, today, { openOnly: true }),
+    prisma.salesOrder.groupBy({
+      by: ['status'],
+      where: { ...orderScope(session), status: { in: ['PENDING_APPROVAL', 'CONFIRMED'] } },
+      _count: { _all: true },
+    }),
   ]);
+  const countOf = (status: string) => orderCounts.find((c) => c.status === status)?._count._all ?? 0;
   return {
-    today: todayKigali(),
+    today,
     month,
     year,
+    receivables: agingOf(openInvoices, today),
+    ordersOnHold: countOf('PENDING_APPROVAL'),
+    ordersToDeliver: countOf('CONFIRMED'),
     repRows,
     trend,
     overdue,

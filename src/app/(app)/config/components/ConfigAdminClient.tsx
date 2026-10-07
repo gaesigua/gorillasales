@@ -9,7 +9,9 @@ import MonthlyTargetsEditor from './MonthlyTargetsEditor';
 import CommissionRulesEditor from './CommissionRulesEditor';
 import CustomFieldsEditor from './CustomFieldsEditor';
 import ProductsEditor from './ProductsEditor';
-import { Tag, CheckSquare, Package, TrendingUp, CheckCircle, Info, Target, DollarSign, List, Sparkles, AlertCircle, Users } from 'lucide-react';
+import PriceListsEditor from './PriceListsEditor';
+import TaxSettingsEditor from './TaxSettingsEditor';
+import { Tags, Receipt, Tag, CheckSquare, Package, TrendingUp, CheckCircle, Info, Target, DollarSign, List, Sparkles, AlertCircle, Users } from 'lucide-react';
 import {
   saveCommissionRules,
   saveLookupList,
@@ -17,9 +19,9 @@ import {
   savePipelineStages,
   saveProducts,
 } from '@/actions/config';
-import type { ActionResult, CommissionRule, ProductItem, RepMonthlyTarget } from '@/lib/types';
+import type { ActionResult, CommissionRule, PriceListDTO, ProductItem, RepMonthlyTarget } from '@/lib/types';
 
-type TabId = 'lookup' | 'products' | 'targets' | 'commission' | 'custom-fields';
+type TabId = 'lookup' | 'products' | 'price-lists' | 'tax' | 'targets' | 'commission' | 'custom-fields';
 
 const TABS: { id: TabId; label: string; icon: React.ReactNode; description: string }[] = [
   {
@@ -33,6 +35,18 @@ const TABS: { id: TabId; label: string; icon: React.ReactNode; description: stri
     label: 'Products',
     icon: <Package size={15} />,
     description: 'Manage the product catalogue: list prices and the coffee weight of each unit.',
+  },
+  {
+    id: 'price-lists',
+    label: 'Price Lists',
+    icon: <Tags size={15} />,
+    description: 'Special prices per customer group. Sales officers cannot change prices on orders; they come from these lists.',
+  },
+  {
+    id: 'tax',
+    label: 'Tax & Invoicing',
+    icon: <Receipt size={15} />,
+    description: 'Company TIN and VAT settings used on orders and invoices.',
   },
   {
     id: 'targets',
@@ -57,9 +71,10 @@ const TABS: { id: TabId; label: string; icon: React.ReactNode; description: stri
 interface ConfigAdminClientProps {
   targets: RepMonthlyTarget[];
   commissionRules: CommissionRule[];
+  priceLists: PriceListDTO[];
 }
 
-export default function ConfigAdminClient({ targets: initialTargets, commissionRules: initialRules }: ConfigAdminClientProps) {
+export default function ConfigAdminClient({ targets: initialTargets, commissionRules: initialRules, priceLists: initialPriceLists }: ConfigAdminClientProps) {
   const router = useRouter();
   const { config } = useConfig();
   const [activeTab, setActiveTab] = useState<TabId>('lookup');
@@ -73,6 +88,8 @@ export default function ConfigAdminClient({ targets: initialTargets, commissionR
   const [products, setProducts] = useState<ProductItem[]>(config.products);
   const [targets, setTargets] = useState<RepMonthlyTarget[]>(initialTargets);
   const [rules, setRules] = useState<CommissionRule[]>(initialRules);
+  const [priceLists, setPriceLists] = useState<PriceListDTO[]>(initialPriceLists);
+  useEffect(() => setPriceLists(initialPriceLists), [initialPriceLists]);
 
   useEffect(() => {
     setCategories(config.customerCategories.map((c) => ({ id: c.id, label: c.label, sortOrder: c.sortOrder })));
@@ -250,6 +267,20 @@ export default function ConfigAdminClient({ targets: initialTargets, commissionR
           onChange={(items) => persist(items, products, setProducts, () => saveProducts(items))}
         />
       )}
+
+      {activeTab === 'price-lists' && (
+        <PriceListsEditor
+          priceLists={priceLists}
+          products={config.products}
+          onSaved={(lists) => {
+            setPriceLists(lists);
+            setStatus({ type: 'saved', message: 'Saved' });
+            router.refresh();
+          }}
+        />
+      )}
+
+      {activeTab === 'tax' && <TaxSettingsEditor settings={config.settings} />}
 
       {activeTab === 'targets' && (
         <MonthlyTargetsEditor

@@ -17,6 +17,8 @@ import {
   Kanban,
   TrendingUp,
   ShieldCheck,
+  ShoppingCart,
+  Wallet,
 } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import { ROLE_LABELS } from '@/lib/roles';
@@ -40,6 +42,16 @@ const navItems: NavItem[] = [
     label: 'Daily Sales Entry',
     href: '/daily-sales-entry',
     icon: <ClipboardList size={20} />,
+  },
+  {
+    label: 'Orders',
+    href: '/orders',
+    icon: <ShoppingCart size={20} />,
+  },
+  {
+    label: 'Receivables',
+    href: '/receivables',
+    icon: <Wallet size={20} />,
   },
   {
     label: 'Customer Management',

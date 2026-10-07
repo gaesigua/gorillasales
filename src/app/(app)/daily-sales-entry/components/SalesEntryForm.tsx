@@ -4,49 +4,44 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
-import { Loader2, Calculator, CheckCircle } from 'lucide-react';
+import { Loader2, CheckCircle } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
 import { formatRWFFull } from '@/lib/format';
 import { useConfig } from '@/context/ConfigContext';
 import { useUser } from '@/context/UserContext';
 import { createVisitLog } from '@/actions/visits';
-import { CUSTOMER_TYPE_LABELS, PAYMENT_STATUS_OPTIONS, type PaymentStatusValue } from '@/lib/types';
-import type { CustomerOption } from './DailySalesEntryClient';
+import { CUSTOMER_TYPE_LABELS } from '@/lib/types';
+import OrderLinesEditor, { completedLines, emptyLine, type DraftLine } from '@/components/orders/OrderLinesEditor';
+import type { CustomerOption, PriceBook } from './DailySalesEntryClient';
 
 interface VisitFormData {
   salespersonId: string;
   dateOfVisit: string;
   customerId: string;
   visitOutcome: string;
-  productId: string;
-  quantity: number;
-  unitPrice: number;
-  paymentStatus: PaymentStatusValue | '';
   nextFollowUpDate: string;
   remarks: string;
 }
 
 interface SalesEntryFormProps {
   customers: CustomerOption[];
+  priceBook: PriceBook;
   today: string;
 }
 
-export default function SalesEntryForm({ customers, today }: SalesEntryFormProps) {
+export default function SalesEntryForm({ customers, priceBook, today }: SalesEntryFormProps) {
   const router = useRouter();
   const { config } = useConfig();
   const { currentUser, canViewAllReps } = useUser();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [lines, setLines] = useState<DraftLine[]>([emptyLine()]);
 
   const emptyForm: VisitFormData = {
     salespersonId: canViewAllReps ? '' : currentUser.id,
     dateOfVisit: today,
     customerId: '',
     visitOutcome: '',
-    productId: '',
-    quantity: 0,
-    unitPrice: 0,
-    paymentStatus: '',
     nextFollowUpDate: '',
     remarks: '',
   };
@@ -55,35 +50,28 @@ export default function SalesEntryForm({ customers, today }: SalesEntryFormProps
     register,
     handleSubmit,
     watch,
-    setValue,
     reset,
     formState: { errors },
   } = useForm<VisitFormData>({ defaultValues: emptyForm });
 
-  const quantity = Number(watch('quantity')) || 0;
-  const unitPrice = Number(watch('unitPrice')) || 0;
-  const salesValue = quantity * unitPrice;
   const selectedCustomer = customers.find((c) => c.id === watch('customerId'));
-  const hasOrder = quantity > 0;
-
-  const productField = register('productId', {
-    validate: (v) => !hasOrder || !!v || 'Select the product sold',
-  });
+  const priceFor = (productId: string) =>
+    (selectedCustomer?.priceListId ? priceBook[selectedCustomer.priceListId]?.[productId] : undefined) ??
+    config.products.find((p) => p.id === productId)?.unitPrice ??
+    0;
 
   const onSubmit = async (data: VisitFormData) => {
     setIsSubmitting(true);
     try {
+      const orderLines = completedLines(lines, canViewAllReps);
       const res = await createVisitLog({
         salespersonId: data.salespersonId || undefined,
         customerId: data.customerId,
         dateOfVisit: data.dateOfVisit,
         visitOutcome: data.visitOutcome,
-        productId: data.productId || undefined,
-        quantity: Number(data.quantity) || 0,
-        unitPrice: Number(data.unitPrice) || 0,
-        paymentStatus: data.paymentStatus || 'PENDING',
         nextFollowUpDate: data.nextFollowUpDate || undefined,
         remarks: data.remarks,
+        orderLines,
       });
 
       if (!res.success) {
@@ -92,13 +80,17 @@ export default function SalesEntryForm({ customers, today }: SalesEntryFormProps
       }
 
       setSubmitSuccess(true);
-      toast.success('Visit logged', {
-        description: `${res.data?.customerName} · ${formatRWFFull(res.data?.salesValue ?? 0)}`,
+      const v = res.data;
+      toast.success(v?.orderNumber ? `Visit and order ${v.orderNumber} saved` : 'Visit logged', {
+        description: v?.orderNumber
+          ? `${v.customerName} · ${formatRWFFull(v.salesValue)}${v.orderStatus === 'PENDING_APPROVAL' ? ' · on credit hold, needs manager approval' : ''}`
+          : v?.customerName,
       });
       router.refresh();
       setTimeout(() => {
         setSubmitSuccess(false);
         reset({ ...emptyForm, salespersonId: data.salespersonId, dateOfVisit: data.dateOfVisit });
+        setLines([emptyLine()]);
       }, 1500);
     } finally {
       setIsSubmitting(false);
@@ -241,99 +233,27 @@ export default function SalesEntryForm({ customers, today }: SalesEntryFormProps
         <div className="bg-card border border-border rounded-xl overflow-hidden mb-4">
           <div className="px-5 py-3 bg-accent/5 border-b border-accent/20">
             <h3 className="text-xs font-semibold uppercase tracking-widest text-accent">
-              Order Details <span className="normal-case tracking-normal font-normal">— leave quantity at 0 if no order</span>
+              Order Taken <span className="normal-case tracking-normal font-normal">— leave empty if no order</span>
             </h3>
           </div>
-          <div className="p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {/* Product */}
-            <div>
-              <label className={labelClass} htmlFor="productId">
-                Product
-              </label>
-              <select
-                id="productId"
-                className={selectClass}
-                {...productField}
-                onChange={(e) => {
-                  productField.onChange(e);
-                  const product = config.products.find((p) => p.id === e.target.value);
-                  if (product) setValue('unitPrice', product.unitPrice);
-                }}
-              >
-                <option value="">Select product...</option>
-                {config.products.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.label}
-                  </option>
-                ))}
-              </select>
-              {errors.productId && <p className={errorClass}>{errors.productId.message}</p>}
-            </div>
-
-            {/* Quantity */}
-            <div>
-              <label className={labelClass} htmlFor="quantity">
-                Quantity (units)
-              </label>
-              <input
-                id="quantity"
-                type="number"
-                min="0"
-                className={inputClass}
-                placeholder="0"
-                {...register('quantity', { min: { value: 0, message: 'Must be 0 or more' }, valueAsNumber: true })}
-              />
-              {errors.quantity && <p className={errorClass}>{errors.quantity.message}</p>}
-            </div>
-
-            {/* Unit Price */}
-            <div>
-              <label className={labelClass} htmlFor="unitPrice">
-                Unit Price (RWF)
-              </label>
-              <input
-                id="unitPrice"
-                type="number"
-                min="0"
-                className={inputClass}
-                placeholder="0"
-                {...register('unitPrice', { min: { value: 0, message: 'Must be 0 or more' }, valueAsNumber: true })}
-              />
-              <p className={helperClass}>Filled from the product list price; adjust if discounted</p>
-              {errors.unitPrice && <p className={errorClass}>{errors.unitPrice.message}</p>}
-            </div>
-
-            {/* Calculated Sales Value */}
-            <div className="sm:col-span-2 lg:col-span-1">
-              <span className={labelClass}>Sales Value (RWF)</span>
-              <div className="flex items-center gap-2 bg-primary/5 border border-primary/20 rounded-lg px-3 py-2.5">
-                <Calculator size={16} className="text-primary shrink-0" />
-                <span className="text-sm font-bold text-primary font-tabular">{formatRWFFull(salesValue)}</span>
-              </div>
-              <p className={helperClass}>Auto-calculated: Quantity × Unit Price</p>
-            </div>
-
-            {/* Payment Status */}
-            <div>
-              <label className={labelClass} htmlFor="paymentStatus">
-                Payment Status {hasOrder && <span className="text-negative">*</span>}
-              </label>
-              <select
-                id="paymentStatus"
-                className={selectClass}
-                {...register('paymentStatus', {
-                  validate: (v) => !hasOrder || !!v || 'Select payment status',
-                })}
-              >
-                <option value="">Select status...</option>
-                {PAYMENT_STATUS_OPTIONS.map((s) => (
-                  <option key={s.value} value={s.value}>
-                    {s.label}
-                  </option>
-                ))}
-              </select>
-              {errors.paymentStatus && <p className={errorClass}>{errors.paymentStatus.message}</p>}
-            </div>
+          <div className="p-5">
+            <OrderLinesEditor
+              lines={lines}
+              onChange={setLines}
+              products={config.products}
+              priceFor={priceFor}
+              canEditPrice={canViewAllReps}
+              vatRate={config.settings.vatRate}
+              pricesIncludeVat={config.settings.pricesIncludeVat}
+            />
+            {selectedCustomer && (
+              <p className="text-xs text-muted-foreground mt-3">
+                {selectedCustomer.paymentTermsDays > 0
+                  ? `Credit terms: pay within ${selectedCustomer.paymentTermsDays} days of delivery.`
+                  : 'Cash on delivery.'}{' '}
+                Orders over the credit limit, or for customers with overdue invoices, go on hold for manager approval.
+              </p>
+            )}
           </div>
         </div>
 
@@ -398,7 +318,10 @@ export default function SalesEntryForm({ customers, today }: SalesEntryFormProps
           <button
             type="button"
             className="px-4 py-2.5 rounded-lg text-sm font-medium text-muted-foreground border border-border hover:bg-muted transition-colors"
-            onClick={() => reset(emptyForm)}
+            onClick={() => {
+              reset(emptyForm);
+              setLines([emptyLine()]);
+            }}
           >
             Clear Form
           </button>

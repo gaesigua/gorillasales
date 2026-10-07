@@ -17,3 +17,15 @@ export const MANAGER_ROLES: Role[] = ['ADMIN', 'MANAGER'];
 export function isManagerRole(role: Role): boolean {
   return MANAGER_ROLES.includes(role);
 }
+
+/** Staff who hand goods over and collect money: may mark orders delivered and see all orders. */
+export const FULFILMENT_ROLES: Role[] = ['ADMIN', 'MANAGER', 'DELIVERY_SUPPORT', 'DRIVER'];
+
+export function canDeliverOrders(role: Role): boolean {
+  return FULFILMENT_ROLES.includes(role);
+}
+
+/** May record the RRA EBM receipt number on invoices. */
+export function canSetEbmNumber(role: Role): boolean {
+  return ['ADMIN', 'MANAGER', 'DELIVERY_SUPPORT'].includes(role);
+}

@@ -5,17 +5,29 @@ import { prisma } from '@/lib/prisma';
 import type { UserSession } from '@/lib/auth';
 import { scopedSalespersonId } from '@/lib/tenant';
 import { dateColumnToString, stringToDateColumn } from '@/lib/dates';
-import { CUSTOMER_TYPE_LABELS, paymentStatusLabel, type VisitLog } from '@/lib/types';
+import { toNumber } from '@/lib/domain/money';
+import { CUSTOMER_TYPE_LABELS, type VisitLog } from '@/lib/types';
 
 export const visitInclude = {
   salesperson: { select: { name: true } },
   customer: { select: { name: true, area: true, category: true, customerType: true } },
-  product: { select: { name: true, weightKg: true } },
+  order: {
+    select: {
+      id: true,
+      orderNumber: true,
+      status: true,
+      total: true,
+      lines: { select: { quantity: true, unitWeightKg: true, product: { select: { name: true } } } },
+    },
+  },
 } satisfies Prisma.VisitLogInclude;
 
 type VisitRow = Prisma.VisitLogGetPayload<{ include: typeof visitInclude }>;
 
 export function toVisitDTO(v: VisitRow): VisitLog {
+  // A cancelled order no longer counts as a sale made during the visit
+  const order = v.order && v.order.status !== 'CANCELLED' ? v.order : null;
+  const lines = order?.lines ?? [];
   return {
     id: v.id,
     timestamp: v.createdAt.toISOString(),
@@ -27,13 +39,12 @@ export function toVisitDTO(v: VisitRow): VisitLog {
     area: v.customer.area,
     customerCategory: v.customer.category,
     visitOutcome: v.visitOutcome,
-    productId: v.productId ?? undefined,
-    productCategory: v.product?.name ?? '—',
-    quantity: v.quantity,
-    weightKg: v.quantity * (v.product?.weightKg ?? 0),
-    unitPrice: v.unitPrice,
-    salesValue: v.salesValue,
-    paymentStatus: paymentStatusLabel(v.paymentStatus),
+    orderId: order?.id,
+    orderNumber: order?.orderNumber,
+    orderStatus: order?.status,
+    productSummary: lines.map((l) => `${l.product.name} ×${toNumber(l.quantity)}`).join(', '),
+    salesValue: order ? toNumber(order.total) : 0,
+    weightKg: Math.round(lines.reduce((s, l) => s + toNumber(l.quantity) * l.unitWeightKg, 0) * 1000) / 1000,
     customerType: CUSTOMER_TYPE_LABELS[v.customer.customerType],
     nextFollowUpDate: dateColumnToString(v.nextFollowUpDate),
     remarks: v.remarks ?? '',

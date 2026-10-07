@@ -19,11 +19,12 @@ import {
 } from 'lucide-react';
 import { formatRWF } from '@/lib/format';
 import { MONTH_LONG as MONTHS, monthLastDay } from '@/lib/dates';
-import { isOrder, needsFollowUp } from '@/lib/visitRules';
+import { needsFollowUp } from '@/lib/visitRules';
 import { getVisitsForPeriod } from '@/actions/visits';
+import { getOrdersForPeriod } from '@/actions/orders';
 import { useUser } from '@/context/UserContext';
 import { useConfig } from '@/context/ConfigContext';
-import type { RepMonthlyTarget, VisitLog } from '@/lib/types';
+import type { Order, RepMonthlyTarget, VisitLog } from '@/lib/types';
 
 function findTarget(targets: RepMonthlyTarget[], repName: string, month: number, year: number) {
   return targets.find((t) => t.repName === repName && t.month === month && t.year === year);
@@ -86,41 +87,46 @@ function getWeeksInYear(year: number): number {
   return Math.ceil(days / 7);
 }
 
-function buildReportFromLogs(logs: VisitLog[], repNamesAll: string[], repFilter?: string) {
+/** Report figures: sales, KG and payments from orders; visit activity from visit logs. */
+function buildReportFromLogs(logs: VisitLog[], orderList: Order[], repNamesAll: string[], repFilter?: string) {
   const filtered = repFilter ? logs.filter((v) => v.salesperson === repFilter) : logs;
+  const orders = repFilter ? orderList.filter((o) => o.salesperson === repFilter) : orderList;
+  const unpaid = (o: Order) => (o.invoiceId ? o.total - o.amountPaid : 0);
 
-  const totalSales = filtered.reduce((s, v) => s + v.salesValue, 0);
-  const totalKg = Math.round(filtered.reduce((s, v) => s + v.weightKg, 0) * 100) / 100;
+  const totalSales = orders.reduce((s, o) => s + o.total, 0);
+  const totalKg = Math.round(orders.reduce((s, o) => s + o.weightKg, 0) * 100) / 100;
   const totalVisits = filtered.length;
-  const ordersPlaced = filtered.filter(isOrder).length;
+  const ordersPlaced = orders.length;
   const followUps = filtered.filter(needsFollowUp).length;
-  const paidSales = filtered.filter((v) => v.paymentStatus === 'Paid').reduce((s, v) => s + v.salesValue, 0);
-  const creditSales = filtered.filter((v) => v.paymentStatus === 'Credit').reduce((s, v) => s + v.salesValue, 0);
+  const paidSales = orders.reduce((s, o) => s + o.amountPaid, 0);
+  const creditSales = orders.reduce((s, o) => s + unpaid(o), 0);
 
   const repNames = repFilter ? [repFilter] : repNamesAll;
   const byRep: Record<string, RepSummary> = {};
-  repNames.forEach((name) => {
-    byRep[name] = { name, totalVisits: 0, ordersPlaced: 0, totalSales: 0, totalKg: 0, followUps: 0, paidSales: 0, creditSales: 0 };
-  });
+  const rep = (name: string) =>
+    (byRep[name] ??= { name, totalVisits: 0, ordersPlaced: 0, totalSales: 0, totalKg: 0, followUps: 0, paidSales: 0, creditSales: 0 });
+  repNames.forEach(rep);
   filtered.forEach((v) => {
-    if (!byRep[v.salesperson]) {
-      byRep[v.salesperson] = { name: v.salesperson, totalVisits: 0, ordersPlaced: 0, totalSales: 0, totalKg: 0, followUps: 0, paidSales: 0, creditSales: 0 };
-    }
-    byRep[v.salesperson].totalVisits++;
-    if (isOrder(v)) byRep[v.salesperson].ordersPlaced++;
-    if (needsFollowUp(v)) byRep[v.salesperson].followUps++;
-    byRep[v.salesperson].totalSales += v.salesValue;
-    byRep[v.salesperson].totalKg += v.weightKg;
-    if (v.paymentStatus === 'Paid') byRep[v.salesperson].paidSales += v.salesValue;
-    if (v.paymentStatus === 'Credit') byRep[v.salesperson].creditSales += v.salesValue;
+    rep(v.salesperson).totalVisits++;
+    if (needsFollowUp(v)) rep(v.salesperson).followUps++;
+  });
+  orders.forEach((o) => {
+    const r = rep(o.salesperson);
+    r.ordersPlaced++;
+    r.totalSales += o.total;
+    r.totalKg += o.weightKg;
+    r.paidSales += o.amountPaid;
+    r.creditSales += unpaid(o);
   });
 
   const byProduct: Record<string, { qty: number; sales: number }> = {};
-  filtered.forEach((v) => {
-    if (!byProduct[v.productCategory]) byProduct[v.productCategory] = { qty: 0, sales: 0 };
-    byProduct[v.productCategory].qty += v.quantity;
-    byProduct[v.productCategory].sales += v.salesValue;
-  });
+  orders.forEach((o) =>
+    o.lines.forEach((l) => {
+      byProduct[l.productName] ??= { qty: 0, sales: 0 };
+      byProduct[l.productName].qty += l.quantity;
+      byProduct[l.productName].sales += l.lineTotal;
+    })
+  );
 
   return {
     filtered,
@@ -200,6 +206,7 @@ export default function MonthlyReportClient({ today, years, targets }: MonthlyRe
 
   const [generated, setGenerated] = useState(false);
   const [logs, setLogs] = useState<VisitLog[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState('');
   const [exportSuccess, setExportSuccess] = useState('');
@@ -228,8 +235,8 @@ export default function MonthlyReportClient({ today, years, targets }: MonthlyRe
 
   const repNamesAll = useMemo(() => config.salespeople.map((s) => s.label), [config.salespeople]);
   const report = useMemo(
-    () => buildReportFromLogs(logs, canViewAllReps ? repNamesAll : [currentUser.name], effectiveRep || undefined),
-    [logs, repNamesAll, canViewAllReps, currentUser.name, effectiveRep]
+    () => buildReportFromLogs(logs, orders, canViewAllReps ? repNamesAll : [currentUser.name], effectiveRep || undefined),
+    [logs, orders, repNamesAll, canViewAllReps, currentUser.name, effectiveRep]
   );
 
   const badges = useMemo(() => computeBadges(report.repSummaries), [report.repSummaries]);
@@ -256,13 +263,14 @@ export default function MonthlyReportClient({ today, years, targets }: MonthlyRe
     setLoading(true);
     setLoadError('');
     try {
-      const res = await getVisitsForPeriod(from, to);
-      if (!res.success) {
-        setLoadError(res.error);
+      const [res, orderRes] = await Promise.all([getVisitsForPeriod(from, to), getOrdersForPeriod(from, to)]);
+      if (!res.success || !orderRes.success) {
+        setLoadError(!res.success ? res.error : !orderRes.success ? orderRes.error : '');
         setGenerated(false);
         return;
       }
       setLogs(res.data ?? []);
+      setOrders(orderRes.data ?? []);
       setGenerated(true);
     } finally {
       setLoading(false);
@@ -271,7 +279,7 @@ export default function MonthlyReportClient({ today, years, targets }: MonthlyRe
 
   function handleExportCSV() {
     const rows = [
-      ['Sales Rep', 'Total Visits', 'Orders Placed', 'Total Sales (RWF)', 'Total (KG)', 'Paid (RWF)', 'Credit (RWF)', 'Follow-ups'],
+      ['Sales Rep', 'Total Visits', 'Orders Placed', 'Total Sales (RWF)', 'Total (KG)', 'Collected (RWF)', 'Invoiced Unpaid (RWF)', 'Follow-ups'],
       ...report.repSummaries.map((r) => [
         r.name, r.totalVisits, r.ordersPlaced, r.totalSales, r.totalKg, r.paidSales, r.creditSales, r.followUps,
       ]),
@@ -794,9 +802,9 @@ export default function MonthlyReportClient({ today, years, targets }: MonthlyRe
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Payment Breakdown</p>
               <div className="space-y-2">
                 {[
-                  { label: 'Paid', value: report.paidSales, color: 'bg-positive' },
-                  { label: 'Credit', value: report.creditSales, color: 'bg-accent' },
-                  { label: 'Pending', value: report.totalSales - report.paidSales - report.creditSales, color: 'bg-warning' },
+                  { label: 'Collected', value: report.paidSales, color: 'bg-positive' },
+                  { label: 'Invoiced, unpaid', value: report.creditSales, color: 'bg-accent' },
+                  { label: 'Not yet delivered', value: report.totalSales - report.paidSales - report.creditSales, color: 'bg-warning' },
                 ].map((item) => {
                   const pct = report.totalSales > 0 ? Math.round((item.value / report.totalSales) * 100) : 0;
                   return (

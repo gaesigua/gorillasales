@@ -6,11 +6,13 @@ import { prisma } from '@/lib/prisma';
 import { MANAGER_ROLES, requireRole } from '@/lib/tenant';
 import { audit } from '@/lib/audit';
 import { runAction, UserFacingError } from '@/lib/actionUtils';
-import { getAppConfig, listCommissionRules, listMonthlyTargets } from '@/lib/data/config';
+import { getAppConfig, listCommissionRules, listMonthlyTargets, listPriceLists } from '@/lib/data/config';
 import type {
   ActionResult,
   CommissionRule,
   LookupItem,
+  OrganizationSettings,
+  PriceListDTO,
   PipelineStage,
   ProductItem,
   RepMonthlyTarget,
@@ -285,5 +287,109 @@ export async function saveCommissionRules(input: CommissionRule[]): Promise<Acti
     await audit(session, 'UPDATE_COMMISSION_RULES', 'CommissionRule', null, { rules: items });
     revalidatePath('/', 'layout');
     return listCommissionRules(session);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Price lists
+// ---------------------------------------------------------------------------
+
+const priceListSchema = z.object({
+  id: z.string().optional(),
+  name: label,
+  description: z.string().trim().max(300).default(''),
+  items: z.array(z.object({ productId: z.string().min(1), unitPrice: z.coerce.number().min(0) })).max(500),
+});
+
+export type PriceListInput = z.input<typeof priceListSchema>;
+
+/** Create or update a price list and replace its product prices. */
+export async function savePriceList(input: PriceListInput): Promise<ActionResult<PriceListDTO[]>> {
+  return runAction('savePriceList', async () => {
+    const session = await requireRole(MANAGER_ROLES);
+    const { organizationId } = session;
+    const data = priceListSchema.parse(input);
+    uniqueBy(data.items, (i) => i.productId, 'Each product can only be priced once per list.');
+
+    const productCount = await prisma.product.count({
+      where: { organizationId, id: { in: data.items.map((i) => i.productId) } },
+    });
+    if (productCount !== data.items.length) throw new UserFacingError('Unknown product in price list.');
+
+    const id = await prisma.$transaction(async (tx) => {
+      const existing = data.id
+        ? await tx.priceList.findFirst({ where: { id: data.id, organizationId, isActive: true } })
+        : null;
+      if (data.id && !existing) throw new UserFacingError('Price list not found.');
+      const list = existing
+        ? await tx.priceList.update({ where: { id: existing.id }, data: { name: data.name, description: data.description || null } })
+        : await tx.priceList.create({ data: { organizationId, name: data.name, description: data.description || null } });
+      await tx.priceListItem.deleteMany({ where: { priceListId: list.id } });
+      await tx.priceListItem.createMany({
+        data: data.items.map((i) => ({ priceListId: list.id, productId: i.productId, unitPrice: i.unitPrice })),
+      });
+      return list.id;
+    });
+
+    await audit(session, data.id ? 'UPDATE_PRICE_LIST' : 'CREATE_PRICE_LIST', 'PriceList', id, {
+      name: data.name,
+      items: data.items,
+    });
+    revalidatePath('/', 'layout');
+    return listPriceLists(session);
+  });
+}
+
+/** Retire a price list; its customers fall back to product list prices. */
+export async function deletePriceList(priceListId: string): Promise<ActionResult<PriceListDTO[]>> {
+  return runAction('deletePriceList', async () => {
+    const session = await requireRole(MANAGER_ROLES);
+    const list = await prisma.priceList.findFirst({
+      where: { id: z.string().parse(priceListId), organizationId: session.organizationId, isActive: true },
+    });
+    if (!list) throw new UserFacingError('Price list not found.');
+
+    // Free the name so a new list can reuse it
+    await prisma.$transaction([
+      prisma.customer.updateMany({ where: { priceListId: list.id }, data: { priceListId: null } }),
+      prisma.priceList.update({ where: { id: list.id }, data: { isActive: false, name: `${list.name} (retired ${list.id})` } }),
+    ]);
+    await audit(session, 'DELETE_PRICE_LIST', 'PriceList', list.id, { name: list.name });
+    revalidatePath('/', 'layout');
+    return listPriceLists(session);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Organization tax settings (admins only)
+// ---------------------------------------------------------------------------
+
+const orgSettingsSchema = z.object({
+  tin: z
+    .string()
+    .trim()
+    .regex(/^\d{9}$/, 'TIN must be 9 digits')
+    .or(z.literal('')),
+  vatRate: z.coerce.number().min(0).max(100),
+  pricesIncludeVat: z.boolean(),
+});
+
+export async function saveOrganizationSettings(
+  input: z.input<typeof orgSettingsSchema>
+): Promise<ActionResult<OrganizationSettings>> {
+  return runAction('saveOrganizationSettings', async () => {
+    const session = await requireRole(['ADMIN']);
+    const data = orgSettingsSchema.parse(input);
+    const before = await prisma.organization.findUniqueOrThrow({ where: { id: session.organizationId } });
+    await prisma.organization.update({
+      where: { id: session.organizationId },
+      data: { tin: data.tin || null, vatRate: data.vatRate, pricesIncludeVat: data.pricesIncludeVat },
+    });
+    await audit(session, 'UPDATE_ORG_SETTINGS', 'Organization', session.organizationId, {
+      before: { tin: before.tin, vatRate: before.vatRate.toString(), pricesIncludeVat: before.pricesIncludeVat },
+      after: data,
+    });
+    revalidatePath('/', 'layout');
+    return (await getAppConfig(session)).settings;
   });
 }

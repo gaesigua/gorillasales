@@ -3,7 +3,7 @@
 import React, { useState, useMemo } from 'react';
 import { X, Download, FileText, Table, FileSpreadsheet } from 'lucide-react';
 import { formatRWF } from '@/lib/format';
-import type { VisitLog } from '@/lib/types';
+import { ORDER_STATUS_LABELS, type VisitLog } from '@/lib/types';
 
 interface WeeklyReportExportProps {
   visits: VisitLog[];
@@ -88,7 +88,7 @@ export default function WeeklyReportExport({ visits, today, onClose }: WeeklyRep
 
   const TABLE_HEADERS = [
     'Salesperson', 'Customer', 'Area', 'Category', 'Outcome',
-    'Product', 'Qty', 'Unit Price (RWF)', 'Sales Value (RWF)', 'Payment', 'Remarks',
+    'Order', 'Products', 'Order Value (RWF)', 'Order Status', 'Remarks',
   ];
 
   function getRowData(v: VisitLog): string[] {
@@ -98,11 +98,10 @@ export default function WeeklyReportExport({ visits, today, onClose }: WeeklyRep
       v.area,
       v.customerCategory,
       v.visitOutcome,
-      v.productCategory,
-      String(v.quantity),
-      formatRWF(v.unitPrice),
-      formatRWF(v.salesValue),
-      v.paymentStatus,
+      v.orderNumber || '—',
+      v.productSummary || '—',
+      v.salesValue > 0 ? formatRWF(v.salesValue) : '—',
+      v.orderStatus ? ORDER_STATUS_LABELS[v.orderStatus] : '—',
       v.remarks || '—',
     ];
   }

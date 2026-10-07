@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import type { UserSession } from '@/lib/auth';
 import { scopedSalespersonId } from '@/lib/tenant';
 import { dateColumnToString } from '@/lib/dates';
+import { toNumber } from '@/lib/domain/money';
 import type { PipelineDeal } from '@/lib/types';
 
 export const dealInclude = {
@@ -16,6 +17,7 @@ export const dealInclude = {
 type DealRow = Prisma.PipelineDealGetPayload<{ include: typeof dealInclude }>;
 
 export function toDealDTO(d: DealRow): PipelineDeal {
+  const potentialValue = toNumber(d.potentialValue);
   return {
     id: d.id,
     title: d.title,
@@ -23,7 +25,7 @@ export function toDealDTO(d: DealRow): PipelineDeal {
     customer: d.customer.name,
     area: d.customer.area,
     contactPerson: d.customer.contactPerson ?? '',
-    potentialValue: d.potentialValue,
+    potentialValue,
     salespersonId: d.salespersonId,
     salesperson: d.salesperson.name,
     stageId: d.stageId,
@@ -32,7 +34,7 @@ export function toDealDTO(d: DealRow): PipelineDeal {
     nextAction: d.nextAction ?? '',
     followUpDate: dateColumnToString(d.followUpDate),
     probability: d.stage.probability,
-    weightedValue: Math.round((d.potentialValue * d.stage.probability) / 100),
+    weightedValue: Math.round((potentialValue * d.stage.probability) / 100),
     remarks: d.remarks ?? '',
   };
 }

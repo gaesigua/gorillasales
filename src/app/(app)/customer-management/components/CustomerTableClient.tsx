@@ -1,16 +1,15 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
 import { Search, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Eye, X, AlertTriangle, Download, Plus } from 'lucide-react';
 import { formatRWF } from '@/lib/format';
-import type { Customer, CustomerStatusValue, VisitLog } from '@/lib/types';
+import type { Customer, VisitLog } from '@/lib/types';
 import Badge from '@/components/ui/Badge';
 import CustomerDetailPanel from './CustomerDetailPanel';
 import WeeklyReportExport from './WeeklyReportExport';
 import { useConfig } from '@/context/ConfigContext';
 import { useUser } from '@/context/UserContext';
-import { createCustomer } from '@/actions/customers';
+import CustomerFormModal from './CustomerFormModal';
 
 type SortKey = keyof Customer;
 
@@ -50,39 +49,7 @@ function isOverdue(dateStr: string, today: string) {
   return !!dateStr && dateStr <= today;
 }
 
-const STATUS_VALUES: Record<NewCustomerForm['status'], CustomerStatusValue> = {
-  Active: 'ACTIVE',
-  Inactive: 'INACTIVE',
-  Prospect: 'PROSPECT',
-};
-
 const PAGE_SIZE_OPTIONS = [5, 10, 20];
-
-interface NewCustomerForm {
-  name: string;
-  category: string;
-  area: string;
-  contactPerson: string;
-  phone: string;
-  salesperson: string;
-  mainProduct: string;
-  monthlyPotential: string;
-  status: 'Active' | 'Inactive' | 'Prospect';
-  remarks: string;
-}
-
-const EMPTY_FORM: NewCustomerForm = {
-  name: '',
-  category: '',
-  area: '',
-  contactPerson: '',
-  phone: '',
-  salesperson: '',
-  mainProduct: '',
-  monthlyPotential: '',
-  status: 'Prospect',
-  remarks: '',
-};
 
 interface CustomerTableClientProps {
   customers: Customer[];
@@ -91,16 +58,12 @@ interface CustomerTableClientProps {
 }
 
 export default function CustomerTableClient({ customers, recentVisits, today }: CustomerTableClientProps) {
-  const router = useRouter();
   const { config } = useConfig();
   const { currentUser, canViewAllReps } = useUser();
   const customerCategories = config.customerCategories.map((i) => i.label);
   const salespeople = config.salespeople;
-  const products = config.products;
 
   const customerList = customers;
-  const [saveError, setSaveError] = useState('');
-  const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
   // For managers/admins: salesperson filter dropdown; for officers: locked to their own name
@@ -112,10 +75,8 @@ export default function CustomerTableClient({ customers, recentVisits, today }: 
   const [pageSize, setPageSize] = useState(10);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [showExport, setShowExport] = useState(false);
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [formData, setFormData] = useState<NewCustomerForm>(EMPTY_FORM);
-  const [formErrors, setFormErrors] = useState<Partial<Record<keyof NewCustomerForm, string>>>({});
-  const [addSuccess, setAddSuccess] = useState(false);
+  // null = closed, 'new' = add form, Customer = edit form
+  const [formCustomer, setFormCustomer] = useState<Customer | 'new' | null>(null);
 
 
   const filtered = useMemo(() => {
@@ -196,74 +157,6 @@ export default function CustomerTableClient({ customers, recentVisits, today }: 
     return counts;
   }, [customerList]);
 
-  // Add customer form handlers
-  const handleFormChange = (field: keyof NewCustomerForm, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-    if (formErrors[field]) {
-      setFormErrors((prev) => ({ ...prev, [field]: undefined }));
-    }
-  };
-
-  const validateForm = (): boolean => {
-    const errors: Partial<Record<keyof NewCustomerForm, string>> = {};
-    if (!formData.name.trim()) errors.name = 'Customer name is required';
-    if (!formData.category) errors.category = 'Category is required — every customer must be grouped';
-    if (!formData.area.trim()) errors.area = 'Area is required';
-    if (!formData.contactPerson.trim()) errors.contactPerson = 'Contact person is required';
-    if (canViewAllReps && !formData.salesperson) errors.salesperson = 'Assign a sales rep';
-    setFormErrors(errors);
-    return Object.keys(errors).length === 0;
-  };
-
-  const handleAddCustomer = async () => {
-    if (!validateForm()) return;
-    setSaving(true);
-    setSaveError('');
-    try {
-      const res = await createCustomer({
-        name: formData.name.trim(),
-        category: formData.category,
-        area: formData.area.trim(),
-        contactPerson: formData.contactPerson.trim(),
-        phone: formData.phone.trim(),
-        salespersonId: formData.salesperson,
-        mainProductId: formData.mainProduct,
-        monthlyPotential: Number(formData.monthlyPotential) || 0,
-        status: STATUS_VALUES[formData.status],
-        remarks: formData.remarks.trim(),
-      });
-      if (!res.success) {
-        setSaveError(res.error);
-        return;
-      }
-      router.refresh();
-      setAddSuccess(true);
-      setTimeout(() => {
-        setAddSuccess(false);
-        setShowAddModal(false);
-        setFormData(EMPTY_FORM);
-        setFormErrors({});
-      }, 1200);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleCloseModal = () => {
-    setShowAddModal(false);
-    setFormData(EMPTY_FORM);
-    setFormErrors({});
-    setAddSuccess(false);
-    setSaveError('');
-  };
-
-  const inputClass =
-    'w-full bg-input border border-border rounded-lg px-4 py-3 text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-colors';
-  const selectClass =
-    'w-full bg-input border border-border rounded-lg px-4 py-3 text-base text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-colors cursor-pointer';
-  const labelClass = 'block text-sm font-semibold text-foreground mb-2 tracking-wide';
-  const errorClass = 'text-xs text-negative mt-1.5';
-
   return (
     <>
       {showExport && <WeeklyReportExport visits={recentVisits} today={today} onClose={() => setShowExport(false)} />}
@@ -271,206 +164,15 @@ export default function CustomerTableClient({ customers, recentVisits, today }: 
         <CustomerDetailPanel
           customer={selectedCustomer}
           onClose={() => setSelectedCustomer(null)}
+          onEdit={(c) => {
+            setSelectedCustomer(null);
+            setFormCustomer(c);
+          }}
         />
       )}
 
-      {/* Add Customer Modal */}
-      {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border sticky top-0 bg-card z-10">
-              <div>
-                <h2 className="text-lg font-semibold text-foreground">Add New Customer</h2>
-                <p className="text-xs text-muted-foreground mt-0.5">All customers must be assigned a category upon entry</p>
-              </div>
-              <button
-                onClick={handleCloseModal}
-                className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            {addSuccess ? (
-              <div className="px-6 py-16 flex flex-col items-center gap-3">
-                <div className="w-14 h-14 rounded-full bg-positive/10 flex items-center justify-center">
-                  <svg className="w-7 h-7 text-positive" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-                <p className="text-base font-semibold text-foreground">Customer added successfully!</p>
-                <p className="text-sm text-muted-foreground">{formData.name} · {formData.category}</p>
-              </div>
-            ) : (
-              <div className="p-6 space-y-5">
-                {/* Category — highlighted as required grouping field */}
-                <div className="bg-primary/5 border border-primary/20 rounded-xl p-4">
-                  <label className="block text-xs font-bold text-primary mb-2 uppercase tracking-widest">
-                    Customer Category <span className="text-negative">*</span>
-                  </label>
-                  <p className="text-xs text-muted-foreground mb-3">
-                    Select the business type that best describes this customer. This grouping is required for all accounts.
-                  </p>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    {customerCategories.map((cat) => (
-                      <button
-                        key={`cat-btn-${cat}`}
-                        type="button"
-                        onClick={() => handleFormChange('category', cat)}
-                        className={`px-3 py-2.5 rounded-lg text-xs font-semibold border transition-all text-center ${
-                          formData.category === cat
-                            ? 'bg-primary text-primary-foreground border-primary shadow-sm'
-                            : 'bg-input border-border text-foreground hover:border-primary/50 hover:bg-primary/5'
-                        }`}
-                      >
-                        {cat}
-                      </button>
-                    ))}
-                  </div>
-                  {formErrors.category && (
-                    <p className={`${errorClass} mt-2`}>{formErrors.category}</p>
-                  )}
-                </div>
-
-                {/* Basic Info */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className={labelClass}>Customer Name <span className="text-negative">*</span></label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Kigali Grand Hotel"
-                      value={formData.name}
-                      onChange={(e) => handleFormChange('name', e.target.value)}
-                      className={`${inputClass} ${formErrors.name ? 'border-negative' : ''}`}
-                    />
-                    {formErrors.name && <p className={errorClass}>{formErrors.name}</p>}
-                  </div>
-                  <div>
-                    <label className={labelClass}>Area / Location <span className="text-negative">*</span></label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Kigali Centre"
-                      value={formData.area}
-                      onChange={(e) => handleFormChange('area', e.target.value)}
-                      className={`${inputClass} ${formErrors.area ? 'border-negative' : ''}`}
-                    />
-                    {formErrors.area && <p className={errorClass}>{formErrors.area}</p>}
-                  </div>
-                  <div>
-                    <label className={labelClass}>Contact Person <span className="text-negative">*</span></label>
-                    <input
-                      type="text"
-                      placeholder="Full name"
-                      value={formData.contactPerson}
-                      onChange={(e) => handleFormChange('contactPerson', e.target.value)}
-                      className={`${inputClass} ${formErrors.contactPerson ? 'border-negative' : ''}`}
-                    />
-                    {formErrors.contactPerson && <p className={errorClass}>{formErrors.contactPerson}</p>}
-                  </div>
-                  <div>
-                    <label className={labelClass}>Phone</label>
-                    <input
-                      type="text"
-                      placeholder="+250 788 000 000"
-                      value={formData.phone}
-                      onChange={(e) => handleFormChange('phone', e.target.value)}
-                      className={inputClass}
-                    />
-                  </div>
-                  <div>
-                    <label className={labelClass}>Assigned Sales Rep <span className="text-negative">*</span></label>
-                    {canViewAllReps ? (
-                      <select
-                        value={formData.salesperson}
-                        onChange={(e) => handleFormChange('salesperson', e.target.value)}
-                        className={`${selectClass} ${formErrors.salesperson ? 'border-negative' : ''}`}
-                      >
-                        <option value="">Select rep...</option>
-                        {salespeople.map((sp) => (
-                          <option key={`add-sp-${sp.id}`} value={sp.id}>{sp.label}</option>
-                        ))}
-                      </select>
-                    ) : (
-                      <div className={`${inputClass} bg-muted/40 text-muted-foreground`}>{currentUser.name}</div>
-                    )}
-                    {formErrors.salesperson && <p className={errorClass}>{formErrors.salesperson}</p>}
-                  </div>
-                  <div>
-                    <label className={labelClass}>Status</label>
-                    <select
-                      value={formData.status}
-                      onChange={(e) => handleFormChange('status', e.target.value as 'Active' | 'Inactive' | 'Prospect')}
-                      className={selectClass}
-                    >
-                      <option value="Prospect">Prospect</option>
-                      <option value="Active">Active</option>
-                      <option value="Inactive">Inactive</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className={labelClass}>Main Product</label>
-                    <select
-                      value={formData.mainProduct}
-                      onChange={(e) => handleFormChange('mainProduct', e.target.value)}
-                      className={selectClass}
-                    >
-                      <option value="">Select product...</option>
-                      {products.map((p) => (
-                        <option key={`add-prod-${p.id}`} value={p.id}>{p.label}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className={labelClass}>Monthly Potential (RWF)</label>
-                    <input
-                      type="number"
-                      placeholder="e.g. 500000"
-                      value={formData.monthlyPotential}
-                      onChange={(e) => handleFormChange('monthlyPotential', e.target.value)}
-                      className={inputClass}
-                      min={0}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className={labelClass}>Remarks</label>
-                  <textarea
-                    rows={3}
-                    placeholder="Any notes about this customer..."
-                    value={formData.remarks}
-                    onChange={(e) => handleFormChange('remarks', e.target.value)}
-                    className={`${inputClass} resize-none`}
-                  />
-                </div>
-
-                {saveError && (
-                  <p className="text-sm text-negative bg-negative-bg border border-negative/20 rounded-lg px-3 py-2">{saveError}</p>
-                )}
-
-                {/* Actions */}
-                <div className="flex items-center justify-end gap-3 pt-2 border-t border-border">
-                  <button
-                    type="button"
-                    onClick={handleCloseModal}
-                    className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground border border-border rounded-lg hover:bg-muted transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleAddCustomer}
-                    disabled={saving}
-                    className="px-5 py-2 bg-primary text-primary-foreground text-sm font-semibold rounded-lg hover:bg-primary/90 transition-colors active:scale-95 disabled:opacity-60"
-                  >
-                    {saving ? 'Saving...' : 'Add Customer'}
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
+      {formCustomer && (
+        <CustomerFormModal customer={formCustomer === 'new' ? null : formCustomer} onClose={() => setFormCustomer(null)} />
       )}
 
       <div className="px-6 lg:px-8 xl:px-10 2xl:px-12 py-6 max-w-screen-2xl mx-auto space-y-6">
@@ -493,7 +195,7 @@ export default function CustomerTableClient({ customers, recentVisits, today }: 
               Weekly Report
             </button>
             <button
-              onClick={() => setShowAddModal(true)}
+              onClick={() => setFormCustomer('new')}
               className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground text-sm font-semibold rounded-lg hover:bg-primary/90 transition-colors active:scale-95"
             >
               <Plus size={15} />

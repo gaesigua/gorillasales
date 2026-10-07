@@ -1,8 +1,7 @@
 'use server';
 
 import { prisma } from '@/lib/prisma';
-import { getTenantContext } from '@/lib/tenant';
-import { visitLogs } from '@/lib/mockData';
+import { canViewAllReps, requireSession, scopedSalespersonId } from '@/lib/tenant';
 
 export interface CustomerDTO {
   id: string;
@@ -41,9 +40,8 @@ export interface CreateCustomerInput {
  * Fetch all customers for the current organization
  */
 export async function getCustomers(salespersonId?: string): Promise<CustomerDTO[]> {
+  const { organizationId } = await requireSession();
   try {
-    const { organizationId } = await getTenantContext();
-
     const where: any = { organizationId };
     if (salespersonId) {
       where.salespersonId = salespersonId;
@@ -141,8 +139,15 @@ export async function getCustomers(salespersonId?: string): Promise<CustomerDTO[
  * Create a new Customer record in Prisma database
  */
 export async function createCustomer(input: CreateCustomerInput): Promise<{ success: boolean; customer?: CustomerDTO; error?: string }> {
+  const session = await requireSession();
+  const { organizationId } = session;
   try {
-    const { organizationId } = await getTenantContext();
+    let salespersonId = input.salespersonId ? scopedSalespersonId(session, input.salespersonId) : undefined;
+    if (!salespersonId && !canViewAllReps(session)) salespersonId = session.userId;
+    if (salespersonId) {
+      const rep = await prisma.user.findFirst({ where: { id: salespersonId, organizationId }, select: { id: true } });
+      if (!rep) return { success: false, error: 'Salesperson not found' };
+    }
 
     const newCustomer = await prisma.customer.create({
       data: {
@@ -156,7 +161,7 @@ export async function createCustomer(input: CreateCustomerInput): Promise<{ succ
         email: input.email,
         phone: input.phone,
         address: input.address,
-        salespersonId: input.salespersonId,
+        salespersonId,
         creditLimit: input.creditLimit ?? 0,
       },
       include: {
@@ -186,6 +191,6 @@ export async function createCustomer(input: CreateCustomerInput): Promise<{ succ
     };
   } catch (error: any) {
     console.error('Error creating customer via Server Action:', error);
-    return { success: false, error: error.message || 'Failed to create customer' };
+    return { success: false, error: 'Failed to create customer' };
   }
 }

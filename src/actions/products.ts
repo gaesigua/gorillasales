@@ -1,7 +1,7 @@
 'use server';
 
 import { prisma } from '@/lib/prisma';
-import { getTenantContext } from '@/lib/tenant';
+import { requireSession } from '@/lib/tenant';
 
 export interface ProductDTO {
   id: string;
@@ -14,9 +14,8 @@ export interface ProductDTO {
 }
 
 export async function getProducts(): Promise<ProductDTO[]> {
+  const { organizationId } = await requireSession();
   try {
-    const { organizationId } = await getTenantContext();
-
     const dbProducts = await prisma.product.findMany({
       where: { organizationId, isActive: true },
       orderBy: { name: 'asc' },

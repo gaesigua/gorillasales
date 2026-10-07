@@ -23,7 +23,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { useUser, MOCK_USERS } from '@/context/UserContext';
-import { logoutAction, loginAction } from '@/lib/auth';
+import { logoutAction } from '@/actions/auth';
 
 interface NavItem {
   label: string;

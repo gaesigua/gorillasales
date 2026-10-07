@@ -1,8 +1,16 @@
 import { PrismaClient, UserRole, PaymentStatus, CustomerType, FieldType } from '@prisma/client';
 
+import bcrypt from 'bcryptjs';
+
 const prisma = new PrismaClient();
 
 async function main() {
+  const seedPassword = process.env.SEED_USER_PASSWORD;
+  if (!seedPassword || seedPassword.length < 10) {
+    throw new Error('Set SEED_USER_PASSWORD (min 10 chars) — it becomes the initial password of every seeded user.');
+  }
+  const passwordHash = await bcrypt.hash(seedPassword, 12);
+
   console.log('🌱 Starting GorillaSales Enterprise Database Seeding...');
 
   // 1. Clean existing records (Optional for idempotency)
@@ -38,6 +46,7 @@ async function main() {
       email: 'eric.m@gorillacoffee.rw',
       name: 'Mugabe Eric',
       initials: 'ME',
+      passwordHash,
       role: UserRole.MANAGER,
     },
   });
@@ -48,6 +57,7 @@ async function main() {
       email: 'remmy.k@gorillacoffee.rw',
       name: 'Karenzi Remmy',
       initials: 'KR',
+      passwordHash,
       role: UserRole.SALES_OFFICER,
     },
   });
@@ -58,6 +68,7 @@ async function main() {
       email: 'alex.m@gorillacoffee.rw',
       name: 'Alex Mushumba',
       initials: 'AM',
+      passwordHash,
       role: UserRole.SALES_OFFICER,
     },
   });
@@ -68,6 +79,7 @@ async function main() {
       email: 'patience.i@gorillacoffee.rw',
       name: 'Isimbi Patience',
       initials: 'IP',
+      passwordHash,
       role: UserRole.SALES_OFFICER,
     },
   });
@@ -78,6 +90,7 @@ async function main() {
       email: 'frank.m@gorillacoffee.rw',
       name: 'Mastiko Frank',
       initials: 'MF',
+      passwordHash,
       role: UserRole.SALES_OFFICER,
     },
   });
@@ -88,6 +101,7 @@ async function main() {
       email: 'dan.m@gorillacoffee.rw',
       name: 'Muyenzi Dan',
       initials: 'MD',
+      passwordHash,
       role: UserRole.SALES_OFFICER,
     },
   });

@@ -1,38 +1,34 @@
-import { prisma } from './prisma';
-import { getSession } from './auth';
+import 'server-only';
 
-export interface TenantContext {
-  organizationId: string;
-  userId?: string;
-  role?: string;
+import { getSession, UserSession } from './auth';
+
+export class AuthError extends Error {}
+
+export const MANAGER_ROLES: UserSession['role'][] = ['ADMIN', 'MANAGER'];
+
+/**
+ * Resolves the authenticated session for Server Actions. Throws if unauthenticated —
+ * there is deliberately no fallback tenant.
+ */
+export async function requireSession(): Promise<UserSession> {
+  const session = await getSession();
+  if (!session) throw new AuthError('Not authenticated');
+  return session;
+}
+
+export async function requireRole(roles: UserSession['role'][]): Promise<UserSession> {
+  const session = await requireSession();
+  if (!roles.includes(session.role)) throw new AuthError('Not authorized');
+  return session;
+}
+
+export function canViewAllReps(session: UserSession): boolean {
+  return MANAGER_ROLES.includes(session.role);
 }
 
 /**
- * Resolves the active tenant context for Server Actions.
- * First checks JWT session cookie; falls back to default tenant if unauthenticated.
+ * Sales officers may only see/act on their own records; managers may optionally filter by rep.
  */
-export async function getTenantContext(): Promise<TenantContext> {
-  try {
-    const session = await getSession();
-    if (session) {
-      return {
-        organizationId: session.organizationId,
-        userId: session.userId,
-        role: session.role,
-      };
-    }
-
-    const org = await prisma.organization.findFirst({
-      where: { slug: 'gorilla-coffee' },
-      select: { id: true },
-    });
-
-    if (org) {
-      return { organizationId: org.id };
-    }
-  } catch (error) {
-    console.warn('⚠️ getTenantContext fallback:', error);
-  }
-
-  return { organizationId: 'gorilla-coffee-default' };
+export function scopedSalespersonId(session: UserSession, requested?: string): string | undefined {
+  return canViewAllReps(session) ? requested : session.userId;
 }

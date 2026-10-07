@@ -1,7 +1,7 @@
 'use server';
 
 import { prisma } from '@/lib/prisma';
-import { getTenantContext } from '@/lib/tenant';
+import { requireSession } from '@/lib/tenant';
 import { monthlyTargets as mockTargets } from '@/lib/mockData';
 
 export interface RepTargetDTO {
@@ -20,9 +20,9 @@ export async function getMonthlyTargets(month?: number, year?: number): Promise<
   const targetMonth = month ?? new Date().getMonth();
   const targetYear = year ?? new Date().getFullYear();
 
-  try {
-    const { organizationId } = await getTenantContext();
+  const { organizationId } = await requireSession();
 
+  try {
     const dbTargets = await prisma.monthlyTarget.findMany({
       where: { organizationId, month: targetMonth, year: targetYear },
       include: {

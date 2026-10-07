@@ -1,7 +1,7 @@
 'use server';
 
 import { prisma } from '@/lib/prisma';
-import { getTenantContext } from '@/lib/tenant';
+import { requireSession, scopedSalespersonId } from '@/lib/tenant';
 import { pipelineDeals as mockDeals } from '@/lib/mockData';
 
 export interface PipelineDealDTO {
@@ -47,12 +47,13 @@ export interface CreateDealInput {
  * Fetch all Pipeline Deals
  */
 export async function getPipelineDeals(salespersonId?: string): Promise<PipelineDealDTO[]> {
+  const session = await requireSession();
+  const { organizationId } = session;
   try {
-    const { organizationId } = await getTenantContext();
-
     const where: any = { organizationId };
-    if (salespersonId) {
-      where.salespersonId = salespersonId;
+    const repId = scopedSalespersonId(session, salespersonId);
+    if (repId) {
+      where.salespersonId = repId;
     }
 
     const dbDeals = await prisma.pipelineDeal.findMany({
@@ -100,9 +101,8 @@ export async function getPipelineDeals(salespersonId?: string): Promise<Pipeline
  * Fetch Pipeline Stages
  */
 export async function getPipelineStages(): Promise<PipelineStageDTO[]> {
+  const { organizationId } = await requireSession();
   try {
-    const { organizationId } = await getTenantContext();
-
     const stages = await prisma.pipelineStage.findMany({
       where: { organizationId },
       orderBy: { sortOrder: 'asc' },
@@ -136,15 +136,18 @@ export async function getPipelineStages(): Promise<PipelineStageDTO[]> {
  * Update Deal Stage & recalculate weighted value
  */
 export async function updateDealStage(dealId: string, stageId: string): Promise<{ success: boolean; error?: string }> {
+  const session = await requireSession();
+  const { organizationId } = session;
   try {
-    const stage = await prisma.pipelineStage.findUnique({
-      where: { id: stageId },
+    const stage = await prisma.pipelineStage.findFirst({
+      where: { id: stageId, organizationId },
     });
 
     if (!stage) return { success: false, error: 'Stage not found' };
 
-    const deal = await prisma.pipelineDeal.findUnique({
-      where: { id: dealId },
+    // Sales officers may only move their own deals
+    const deal = await prisma.pipelineDeal.findFirst({
+      where: { id: dealId, organizationId, salespersonId: scopedSalespersonId(session) },
     });
 
     if (!deal) return { success: false, error: 'Deal not found' };
@@ -165,6 +168,6 @@ export async function updateDealStage(dealId: string, stageId: string): Promise<
     return { success: true };
   } catch (error: any) {
     console.error('Error updating deal stage via Server Action:', error);
-    return { success: false, error: error.message || 'Failed to update deal stage' };
+    return { success: false, error: 'Failed to update deal stage' };
   }
 }

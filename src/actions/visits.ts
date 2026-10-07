@@ -1,7 +1,7 @@
 'use server';
 
 import { prisma } from '@/lib/prisma';
-import { getTenantContext } from '@/lib/tenant';
+import { requireSession, scopedSalespersonId } from '@/lib/tenant';
 import { visitLogs as mockVisits } from '@/lib/mockData';
 
 export interface VisitLogDTO {
@@ -44,12 +44,13 @@ export interface CreateVisitInput {
  * Fetch all Visit Logs for the current organization
  */
 export async function getVisitLogs(salespersonId?: string): Promise<VisitLogDTO[]> {
+  const session = await requireSession();
+  const { organizationId } = session;
   try {
-    const { organizationId } = await getTenantContext();
-
     const where: any = { organizationId };
-    if (salespersonId) {
-      where.salespersonId = salespersonId;
+    const repId = scopedSalespersonId(session, salespersonId);
+    if (repId) {
+      where.salespersonId = repId;
     }
 
     const dbLogs = await prisma.visitLog.findMany({
@@ -100,8 +101,21 @@ export async function getVisitLogs(salespersonId?: string): Promise<VisitLogDTO[
  * Record a new Sales Visit in database
  */
 export async function createVisitLog(input: CreateVisitInput): Promise<{ success: boolean; visit?: VisitLogDTO; error?: string }> {
+  const session = await requireSession();
+  const { organizationId } = session;
   try {
-    const { organizationId } = await getTenantContext();
+    // Sales officers always log visits as themselves; managers may log for a rep in their org
+    const salespersonId = scopedSalespersonId(session, input.salespersonId) ?? session.userId;
+    const [rep, customer, product] = await Promise.all([
+      prisma.user.findFirst({ where: { id: salespersonId, organizationId }, select: { id: true } }),
+      prisma.customer.findFirst({ where: { id: input.customerId, organizationId }, select: { id: true } }),
+      input.productId
+        ? prisma.product.findFirst({ where: { id: input.productId, organizationId }, select: { id: true } })
+        : Promise.resolve(null),
+    ]);
+    if (!rep) return { success: false, error: 'Salesperson not found' };
+    if (!customer) return { success: false, error: 'Customer not found' };
+    if (input.productId && !product) return { success: false, error: 'Product not found' };
 
     const salesValue = input.quantity * input.unitPrice;
 
@@ -115,7 +129,7 @@ export async function createVisitLog(input: CreateVisitInput): Promise<{ success
     const newVisit = await prisma.visitLog.create({
       data: {
         organizationId,
-        salespersonId: input.salespersonId,
+        salespersonId,
         customerId: input.customerId,
         dateOfVisit: new Date(input.dateOfVisit),
         visitOutcome: input.visitOutcome,
@@ -160,6 +174,6 @@ export async function createVisitLog(input: CreateVisitInput): Promise<{ success
     };
   } catch (error: any) {
     console.error('Error creating visit log via Server Action:', error);
-    return { success: false, error: error.message || 'Failed to create visit log' };
+    return { success: false, error: 'Failed to create visit log' };
   }
 }

@@ -1,7 +1,7 @@
 'use server';
 
 import { prisma } from '@/lib/prisma';
-import { getTenantContext } from '@/lib/tenant';
+import { MANAGER_ROLES, requireRole, requireSession } from '@/lib/tenant';
 
 export interface CustomFieldDefinitionDTO {
   id: string;
@@ -38,9 +38,8 @@ export interface CustomFieldValueDTO {
  * Fetch dynamic custom field definitions for an entity type
  */
 export async function getCustomFieldDefinitions(entityType: 'CUSTOMER' | 'VISIT_LOG' | 'DEAL' | 'PRODUCT'): Promise<CustomFieldDefinitionDTO[]> {
+  const { organizationId } = await requireSession();
   try {
-    const { organizationId } = await getTenantContext();
-
     const defs = await prisma.customFieldDefinition.findMany({
       where: { organizationId, entityType },
       orderBy: { sortOrder: 'asc' },
@@ -66,9 +65,8 @@ export async function getCustomFieldDefinitions(entityType: 'CUSTOMER' | 'VISIT_
  * Create a new dynamic custom field definition (Twenty CRM style)
  */
 export async function createCustomFieldDefinition(input: CreateCustomFieldInput): Promise<{ success: boolean; definition?: CustomFieldDefinitionDTO; error?: string }> {
+  const { organizationId } = await requireRole(MANAGER_ROLES);
   try {
-    const { organizationId } = await getTenantContext();
-
     const fieldKey = input.fieldKey || input.name.toLowerCase().replace(/[^a-z0-9]/g, '_');
 
     // Convert string enum
@@ -106,7 +104,7 @@ export async function createCustomFieldDefinition(input: CreateCustomFieldInput)
     };
   } catch (error: any) {
     console.error('Error creating custom field definition:', error);
-    return { success: false, error: error.message || 'Failed to create custom field' };
+    return { success: false, error: 'Failed to create custom field' };
   }
 }
 
@@ -114,8 +112,17 @@ export async function createCustomFieldDefinition(input: CreateCustomFieldInput)
  * Save custom field value for a specific record
  */
 export async function saveCustomFieldValue(entityType: string, entityId: string, fieldDefinitionId: string, value: any): Promise<{ success: boolean; error?: string }> {
+  const { organizationId } = await requireSession();
   try {
-    const { organizationId } = await getTenantContext();
+    // Both the field definition and the target record must belong to the caller's organization
+    const definition = await prisma.customFieldDefinition.findFirst({
+      where: { id: fieldDefinitionId, organizationId, entityType },
+      select: { id: true },
+    });
+    if (!definition) return { success: false, error: 'Field not found' };
+    if (!(await entityBelongsToOrg(entityType, entityId, organizationId))) {
+      return { success: false, error: 'Record not found' };
+    }
 
     await prisma.customFieldValue.upsert({
       where: {
@@ -140,7 +147,7 @@ export async function saveCustomFieldValue(entityType: string, entityId: string,
     return { success: true };
   } catch (error: any) {
     console.error('Error saving custom field value:', error);
-    return { success: false, error: error.message || 'Failed to save value' };
+    return { success: false, error: 'Failed to save value' };
   }
 }
 
@@ -148,9 +155,8 @@ export async function saveCustomFieldValue(entityType: string, entityId: string,
  * Get all custom field values for a specific record
  */
 export async function getCustomFieldValues(entityType: string, entityId: string): Promise<CustomFieldValueDTO[]> {
+  const { organizationId } = await requireSession();
   try {
-    const { organizationId } = await getTenantContext();
-
     const values = await prisma.customFieldValue.findMany({
       where: { organizationId, entityType, entityId },
       include: {
@@ -171,5 +177,21 @@ export async function getCustomFieldValues(entityType: string, entityId: string)
   } catch (error) {
     console.warn('⚠️ getCustomFieldValues error:', error);
     return [];
+  }
+}
+
+async function entityBelongsToOrg(entityType: string, entityId: string, organizationId: string): Promise<boolean> {
+  const where = { id: entityId, organizationId };
+  switch (entityType) {
+    case 'CUSTOMER':
+      return !!(await prisma.customer.findFirst({ where, select: { id: true } }));
+    case 'VISIT_LOG':
+      return !!(await prisma.visitLog.findFirst({ where, select: { id: true } }));
+    case 'DEAL':
+      return !!(await prisma.pipelineDeal.findFirst({ where, select: { id: true } }));
+    case 'PRODUCT':
+      return !!(await prisma.product.findFirst({ where, select: { id: true } }));
+    default:
+      return false;
   }
 }

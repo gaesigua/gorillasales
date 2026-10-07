@@ -73,6 +73,7 @@ model User {
   id             String       @id @default(cuid())
   organizationId String
   email          String       @unique
+  passwordHash   String?      // bcrypt hash; null = cannot log in until a password is set
   name           String
   initials       String
   role           UserRole     @default(SALES_OFFICER)

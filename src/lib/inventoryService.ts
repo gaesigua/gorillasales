@@ -14,6 +14,7 @@ export interface MovementRefs {
   orderId?: string;
   deliveryRunId?: string;
   roastRunId?: string;
+  creditNoteId?: string;
   reason?: string;
 }
 
@@ -105,6 +106,7 @@ export async function putStock(
       orderId: args.orderId,
       deliveryRunId: args.deliveryRunId,
       roastRunId: args.roastRunId,
+      creditNoteId: args.creditNoteId,
       reason: args.reason,
       createdById: session.userId,
     },

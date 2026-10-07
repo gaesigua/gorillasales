@@ -9,9 +9,10 @@ import { runAction, UserFacingError } from '@/lib/actionUtils';
 import { dateColumnToString, stringToDateColumn, todayKigali } from '@/lib/dates';
 import { toNumber } from '@/lib/domain/money';
 import { invoiceBalance } from '@/lib/domain/receivables';
+import { invoiceAmountsTx } from '@/lib/creditService';
 import { nextDocumentNumber } from '@/lib/documentNumbers';
 import { dateString } from '@/lib/orderService';
-import { invoiceInclude, toInvoiceDTO } from '@/lib/data/receivables';
+import { getInvoice } from '@/lib/data/receivables';
 import type { ActionResult, Invoice } from '@/lib/types';
 
 const paymentSchema = z.object({
@@ -46,16 +47,11 @@ export async function recordPayment(input: RecordPaymentInput): Promise<ActionRe
       if (!invoice) throw new UserFacingError('Invoice not found.');
       // Lock the invoice so concurrent payments cannot together exceed the balance
       await tx.$queryRaw`SELECT "id" FROM "invoices" WHERE "id" = ${invoice.id} FOR UPDATE`;
-      const payments = await tx.payment.findMany({ where: { invoiceId: invoice.id }, select: { amount: true } });
       if (invoice.voidedAt) throw new UserFacingError('This invoice has been voided.');
       if (data.paidOn < dateColumnToString(invoice.issueDate)) {
         throw new UserFacingError('Payment date cannot be before the invoice date.');
       }
-      const balance = invoiceBalance({
-        total: toNumber(invoice.total),
-        paid: payments.reduce((s, p) => s + toNumber(p.amount), 0),
-        dueDate: dateColumnToString(invoice.dueDate),
-      });
+      const balance = invoiceBalance(await invoiceAmountsTx(tx, invoice));
       if (data.amount > balance) {
         throw new UserFacingError(`Amount is more than the balance due (RWF ${balance.toLocaleString('en-US')}).`);
       }
@@ -83,8 +79,7 @@ export async function recordPayment(input: RecordPaymentInput): Promise<ActionRe
       reference: data.reference,
     });
     revalidatePath('/', 'layout');
-    const invoice = await prisma.invoice.findUniqueOrThrow({ where: { id: payment.invoiceId }, include: invoiceInclude });
-    return toInvoiceDTO(invoice, today);
+    return (await getInvoice(session, payment.invoiceId, today))!;
   });
 }
 
@@ -96,13 +91,9 @@ export async function setEbmReceiptNumber(invoiceId: string, receiptNumber: stri
     const invoice = await prisma.invoice.findFirst({ where: { id: z.string().parse(invoiceId), ...invoiceScope(session) } });
     if (!invoice) throw new UserFacingError('Invoice not found.');
 
-    const updated = await prisma.invoice.update({
-      where: { id: invoice.id },
-      data: { ebmReceiptNumber: number || null },
-      include: invoiceInclude,
-    });
+    await prisma.invoice.update({ where: { id: invoice.id }, data: { ebmReceiptNumber: number || null } });
     await audit(session, 'SET_EBM_RECEIPT', 'Invoice', invoice.id, { from: invoice.ebmReceiptNumber, to: number });
     revalidatePath('/', 'layout');
-    return toInvoiceDTO(updated, todayKigali());
+    return (await getInvoice(session, invoice.id, todayKigali()))!;
   });
 }

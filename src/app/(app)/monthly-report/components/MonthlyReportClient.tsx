@@ -22,9 +22,10 @@ import { MONTH_LONG as MONTHS, monthLastDay } from '@/lib/dates';
 import { needsFollowUp } from '@/lib/visitRules';
 import { getVisitsForPeriod } from '@/actions/visits';
 import { getOrdersForPeriod } from '@/actions/orders';
+import { getCreditNotesForPeriod } from '@/actions/creditNotes';
 import { useUser } from '@/context/UserContext';
 import { useConfig } from '@/context/ConfigContext';
-import type { Order, RepMonthlyTarget, VisitLog } from '@/lib/types';
+import type { CreditNoteDTO, Order, RepMonthlyTarget, VisitLog } from '@/lib/types';
 
 function findTarget(targets: RepMonthlyTarget[], repName: string, month: number, year: number) {
   return targets.find((t) => t.repName === repName && t.month === month && t.year === year);
@@ -88,12 +89,15 @@ function getWeeksInYear(year: number): number {
 }
 
 /** Report figures: sales, KG and payments from orders; visit activity from visit logs. */
-function buildReportFromLogs(logs: VisitLog[], orderList: Order[], repNamesAll: string[], repFilter?: string) {
+function buildReportFromLogs(logs: VisitLog[], orderList: Order[], creditList: CreditNoteDTO[], repNamesAll: string[], repFilter?: string) {
   const filtered = repFilter ? logs.filter((v) => v.salesperson === repFilter) : logs;
   const orders = repFilter ? orderList.filter((o) => o.salesperson === repFilter) : orderList;
-  const unpaid = (o: Order) => (o.invoiceId ? o.total - o.amountPaid : 0);
+  const unpaid = (o: Order) => (o.invoiceId ? Math.max(0, o.total - o.creditedAmount - o.amountPaid) : 0);
 
-  const totalSales = orders.reduce((s, o) => s + o.total, 0);
+  // Net sales: credit notes issued in the period are deducted from the original rep's sales
+  const credits = repFilter ? creditList.filter((c) => c.salesperson === repFilter) : creditList;
+  const totalCredited = credits.reduce((s, c) => s + c.total, 0);
+  const totalSales = orders.reduce((s, o) => s + o.total, 0) - totalCredited;
   const totalKg = Math.round(orders.reduce((s, o) => s + o.weightKg, 0) * 100) / 100;
   const totalVisits = filtered.length;
   const ordersPlaced = orders.length;
@@ -119,6 +123,8 @@ function buildReportFromLogs(logs: VisitLog[], orderList: Order[], repNamesAll: 
     r.creditSales += unpaid(o);
   });
 
+  credits.forEach((c) => (rep(c.salesperson).totalSales -= c.total));
+
   const byProduct: Record<string, { qty: number; sales: number }> = {};
   orders.forEach((o) =>
     o.lines.forEach((l) => {
@@ -130,6 +136,7 @@ function buildReportFromLogs(logs: VisitLog[], orderList: Order[], repNamesAll: 
 
   return {
     filtered,
+    totalCredited,
     totalSales,
     totalKg,
     totalVisits,
@@ -207,6 +214,7 @@ export default function MonthlyReportClient({ today, years, targets }: MonthlyRe
   const [generated, setGenerated] = useState(false);
   const [logs, setLogs] = useState<VisitLog[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [credits, setCredits] = useState<CreditNoteDTO[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState('');
   const [exportSuccess, setExportSuccess] = useState('');
@@ -235,8 +243,8 @@ export default function MonthlyReportClient({ today, years, targets }: MonthlyRe
 
   const repNamesAll = useMemo(() => config.salespeople.map((s) => s.label), [config.salespeople]);
   const report = useMemo(
-    () => buildReportFromLogs(logs, orders, canViewAllReps ? repNamesAll : [currentUser.name], effectiveRep || undefined),
-    [logs, orders, repNamesAll, canViewAllReps, currentUser.name, effectiveRep]
+    () => buildReportFromLogs(logs, orders, credits, canViewAllReps ? repNamesAll : [currentUser.name], effectiveRep || undefined),
+    [logs, orders, credits, repNamesAll, canViewAllReps, currentUser.name, effectiveRep]
   );
 
   const badges = useMemo(() => computeBadges(report.repSummaries), [report.repSummaries]);
@@ -263,14 +271,19 @@ export default function MonthlyReportClient({ today, years, targets }: MonthlyRe
     setLoading(true);
     setLoadError('');
     try {
-      const [res, orderRes] = await Promise.all([getVisitsForPeriod(from, to), getOrdersForPeriod(from, to)]);
-      if (!res.success || !orderRes.success) {
-        setLoadError(!res.success ? res.error : !orderRes.success ? orderRes.error : '');
+      const [res, orderRes, creditRes] = await Promise.all([
+        getVisitsForPeriod(from, to),
+        getOrdersForPeriod(from, to),
+        getCreditNotesForPeriod(from, to),
+      ]);
+      if (!res.success || !orderRes.success || !creditRes.success) {
+        setLoadError(!res.success ? res.error : !orderRes.success ? orderRes.error : !creditRes.success ? creditRes.error : '');
         setGenerated(false);
         return;
       }
       setLogs(res.data ?? []);
       setOrders(orderRes.data ?? []);
+      setCredits(creditRes.data ?? []);
       setGenerated(true);
     } finally {
       setLoading(false);

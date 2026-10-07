@@ -10,7 +10,7 @@ import { useUser } from '@/context/UserContext';
 import { useConfig } from '@/context/ConfigContext';
 import { deleteVisitLog } from '@/actions/visits';
 import { isOrder } from '@/lib/visitRules';
-import type { CustomerOption, PriceBook, VisitLog } from '@/lib/types';
+import type { CustomerOption, PriceBook, RoutePlanStop, VisitLog } from '@/lib/types';
 
 export type { CustomerOption, PriceBook };
 
@@ -18,10 +18,12 @@ interface DailySalesEntryClientProps {
   visits: VisitLog[];
   customers: CustomerOption[];
   priceBook: PriceBook;
+  routePlan: RoutePlanStop[];
   today: string;
 }
 
-export default function DailySalesEntryClient({ visits, customers, priceBook, today }: DailySalesEntryClientProps) {
+export default function DailySalesEntryClient({ visits, customers, priceBook, routePlan, today }: DailySalesEntryClientProps) {
+  const [preset, setPreset] = useState<{ customerId: string; salespersonId: string; nonce: number } | null>(null);
   const router = useRouter();
   const { currentUser, canViewAllReps } = useUser();
   const { config } = useConfig();
@@ -82,6 +84,42 @@ export default function DailySalesEntryClient({ visits, customers, priceBook, to
         )}
       </div>
 
+      {/* Today's route */}
+      {(() => {
+        const stops = routePlan.filter((s) => !selectedRepId || s.salespersonId === selectedRepId);
+        if (stops.length === 0) return null;
+        const done = stops.filter((s) => s.visited).length;
+        return (
+          <div className="bg-card border border-border rounded-xl p-4">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-sm font-semibold">
+                Today&apos;s route{[...new Set(stops.map((s) => s.routeName))].length === 1 ? ` — ${stops[0].routeName}` : ''}
+              </h2>
+              <span className="text-xs text-muted-foreground">
+                {done}/{stops.length} visited
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {stops.map((s) => (
+                <button
+                  key={`${s.salespersonId}-${s.customerId}`}
+                  onClick={() => {
+                    setPreset({ customerId: s.customerId, salespersonId: s.salespersonId, nonce: Date.now() });
+                    document.getElementById('log-visit')?.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                  className={`px-3 py-1.5 rounded-lg border text-sm text-left ${s.visited ? 'border-positive/40 text-positive' : 'border-border hover:bg-muted'}`}
+                  title={s.visited ? 'Visited today' : 'Log a visit'}
+                >
+                  {s.visited ? '✓ ' : ''}
+                  {s.customerName}
+                  <span className="text-xs text-muted-foreground"> · {s.area}{canViewAllReps && !selectedRepId ? ` · ${s.salesperson.split(' ')[0]}` : ''}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Today's summary strip */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-card border border-border rounded-xl px-5 py-4 flex items-center gap-4">
@@ -121,9 +159,9 @@ export default function DailySalesEntryClient({ visits, customers, priceBook, to
       <div>
         <div className="flex items-center gap-2 mb-4">
           <div className="w-1 h-5 bg-accent rounded-full" />
-          <h2 className="text-base font-semibold text-foreground">Log New Visit</h2>
+          <h2 id="log-visit" className="text-base font-semibold text-foreground">Log New Visit</h2>
         </div>
-        <SalesEntryForm customers={customers} priceBook={priceBook} today={today} />
+        <SalesEntryForm customers={customers} priceBook={priceBook} today={today} preset={preset} />
       </div>
 
       {/* Recent entries table */}

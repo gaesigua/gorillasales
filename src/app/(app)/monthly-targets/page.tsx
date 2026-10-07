@@ -1,6 +1,7 @@
 import { canViewAllReps, requirePageSession } from '@/lib/tenant';
 import { getAppConfig, listCommissionRules, listMonthlyTargets } from '@/lib/data/config';
 import { listOrders } from '@/lib/data/orders';
+import { listCreditNotes } from '@/lib/data/receivables';
 import { listVisits } from '@/lib/data/visits';
 import { monthLastDay, parsePeriodParams } from '@/lib/dates';
 import MonthlyTargetsClient from './components/MonthlyTargetsClient';
@@ -16,12 +17,13 @@ export default async function MonthlyTargetsPage({ searchParams }: PageProps) {
   const from = `${year}-${String(month + 1).padStart(2, '0')}-01`;
 
   const to = monthLastDay(year, month);
-  const [config, visits, orders, yearTargets, commissionRules] = await Promise.all([
+  const [config, visits, orders, yearTargets, commissionRules, credits] = await Promise.all([
     getAppConfig(session),
     listVisits(session, { from, to }),
     listOrders(session, { from, to, excludeCancelled: true }),
     listMonthlyTargets(session, { year }),
     listCommissionRules(session),
+    listCreditNotes(session, { status: ['APPROVED'], issuedFrom: from, issuedTo: to }),
   ]);
   // Sales officers only see their own row and target
   const targets = yearTargets.filter((t) => t.month === month && (allReps || t.salespersonId === session.userId));
@@ -37,6 +39,7 @@ export default async function MonthlyTargetsPage({ searchParams }: PageProps) {
       orders={orders}
       targets={targets}
       commissionRules={commissionRules}
+      credits={credits}
     />
   );
 }

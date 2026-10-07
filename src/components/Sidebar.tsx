@@ -21,6 +21,7 @@ import {
   Wallet,
   Truck,
   Package,
+  Map as MapIcon,
 } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import { ROLE_LABELS, WAREHOUSE_ROLES, type Role } from '@/lib/roles';
@@ -67,6 +68,12 @@ const navItems: NavItem[] = [
     label: 'Inventory',
     href: '/inventory',
     icon: <Package size={20} />,
+  },
+  {
+    label: 'Routes',
+    href: '/routes',
+    icon: <MapIcon size={20} />,
+    roles: ['ADMIN', 'MANAGER', 'SALES_OFFICER'],
   },
   {
     label: 'Customer Management',

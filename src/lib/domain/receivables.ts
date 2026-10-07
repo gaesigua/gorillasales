@@ -1,6 +1,6 @@
 // Invoice status and aging. Dates are YYYY-MM-DD calendar strings.
 
-export type InvoiceStatus = 'PAID' | 'PARTIAL' | 'UNPAID' | 'OVERDUE' | 'VOID';
+export type InvoiceStatus = 'PAID' | 'PARTIAL' | 'UNPAID' | 'OVERDUE' | 'VOID' | 'CREDITED' | 'REFUND_DUE';
 export type AgingBucket = 'current' | 'd1_30' | 'd31_60' | 'd61_90' | 'd90_plus';
 
 export const AGING_LABELS: Record<AgingBucket, string> = {
@@ -13,22 +13,33 @@ export const AGING_LABELS: Record<AgingBucket, string> = {
 
 export interface InvoiceAmounts {
   total: number;
-  paid: number;
+  paid: number; // payments received minus refunds paid out
+  credited?: number; // approved credit notes
   dueDate: string;
   voided?: boolean;
 }
 
+const r2 = (n: number) => Math.round(n * 100) / 100;
+
+/** What the customer still owes: total - approved credits - net payments (never negative). */
 export function invoiceBalance(inv: InvoiceAmounts): number {
   if (inv.voided) return 0;
-  return Math.max(0, Math.round((inv.total - inv.paid) * 100) / 100);
+  return Math.max(0, r2(inv.total - (inv.credited ?? 0) - inv.paid));
+}
+
+/** What we owe the customer: they paid more than the credited invoice is now worth. */
+export function refundDue(inv: InvoiceAmounts): number {
+  if (inv.voided) return 0;
+  return Math.max(0, r2(inv.paid - (inv.total - (inv.credited ?? 0))));
 }
 
 export function invoiceStatus(inv: InvoiceAmounts, today: string): InvoiceStatus {
   if (inv.voided) return 'VOID';
+  if (refundDue(inv) > 0) return 'REFUND_DUE';
   const balance = invoiceBalance(inv);
-  if (balance <= 0) return 'PAID';
+  if (balance <= 0) return (inv.credited ?? 0) >= inv.total && inv.paid <= 0 ? 'CREDITED' : 'PAID';
   if (inv.dueDate < today) return 'OVERDUE';
-  return inv.paid > 0 ? 'PARTIAL' : 'UNPAID';
+  return inv.paid > 0 || (inv.credited ?? 0) > 0 ? 'PARTIAL' : 'UNPAID';
 }
 
 function daysPastDue(dueDate: string, today: string): number {

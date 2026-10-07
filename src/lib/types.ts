@@ -18,14 +18,63 @@ export const PAYMENT_METHOD_LABELS: Record<PaymentMethodValue, string> = {
   CHEQUE: 'Cheque',
 };
 
-export type InvoiceStatusValue = 'PAID' | 'PARTIAL' | 'UNPAID' | 'OVERDUE' | 'VOID';
+export type InvoiceStatusValue = 'PAID' | 'PARTIAL' | 'UNPAID' | 'OVERDUE' | 'VOID' | 'CREDITED' | 'REFUND_DUE';
 export const INVOICE_STATUS_LABELS: Record<InvoiceStatusValue, string> = {
   PAID: 'Paid',
   PARTIAL: 'Part Paid',
   UNPAID: 'Unpaid',
   OVERDUE: 'Overdue',
   VOID: 'Void',
+  CREDITED: 'Credited',
+  REFUND_DUE: 'Refund Due',
 };
+
+export type CreditNoteStatusValue = 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED';
+export const CREDIT_NOTE_STATUS_LABELS: Record<CreditNoteStatusValue, string> = {
+  PENDING_APPROVAL: 'Awaiting approval',
+  APPROVED: 'Approved',
+  REJECTED: 'Rejected',
+};
+
+export type ReturnDispositionValue = 'RESTOCK' | 'WRITE_OFF' | 'NOT_RETURNED';
+export const RETURN_DISPOSITION_LABELS: Record<ReturnDispositionValue, string> = {
+  RESTOCK: 'Returned, resellable (back to stock)',
+  WRITE_OFF: 'Returned, damaged/expired (write off)',
+  NOT_RETURNED: 'No goods returned (price/quantity correction)',
+};
+
+export interface CreditNoteDTO {
+  id: string;
+  creditNoteNumber: string; // empty until approved
+  status: CreditNoteStatusValue;
+  invoiceId: string;
+  invoiceNumber: string;
+  customerId: string;
+  customerName: string;
+  salespersonId: string;
+  salesperson: string;
+  reason: string;
+  requestedOn: string;
+  issueDate: string;
+  subtotal: number;
+  vatAmount: number;
+  total: number;
+  requestedBy: string;
+  rejectedReason: string;
+  refunded: number;
+  lines: { productName: string; quantity: number; unitPrice: number; lineTotal: number; disposition: ReturnDispositionValue }[];
+}
+
+export interface RefundRecord {
+  id: string;
+  refundNumber: string;
+  creditNoteNumber: string;
+  amount: number;
+  method: PaymentMethodValue;
+  reference: string;
+  paidOn: string;
+  paidBy: string;
+}
 
 export type CustomerTypeValue = 'NEW_CUSTOMER' | 'EXISTING_CUSTOMER';
 export const CUSTOMER_TYPE_LABELS: Record<CustomerTypeValue, string> = {
@@ -97,6 +146,7 @@ export interface Order {
   invoiceId: string;
   invoiceNumber: string;
   amountPaid: number; // payments on this order's invoice
+  creditedAmount: number; // approved credit notes on this order's invoice
   deliveryRunId: string;
   deliveryRunNumber: string;
   deliveryRunStatus: DeliveryRunStatusValue | null;
@@ -123,6 +173,7 @@ export type StockMovementTypeValue =
   | 'DISPATCH'
   | 'RETURN'
   | 'DELIVERY'
+  | 'CUSTOMER_RETURN'
   | 'ADJUSTMENT';
 export const STOCK_MOVEMENT_LABELS: Record<StockMovementTypeValue, string> = {
   RECEIPT: 'Received',
@@ -131,6 +182,7 @@ export const STOCK_MOVEMENT_LABELS: Record<StockMovementTypeValue, string> = {
   DISPATCH: 'Loaded on delivery run',
   RETURN: 'Returned from delivery',
   DELIVERY: 'Delivered directly',
+  CUSTOMER_RETURN: 'Customer return',
   ADJUSTMENT: 'Adjustment',
 };
 
@@ -245,12 +297,18 @@ export interface Invoice {
   subtotal: number;
   vatAmount: number;
   total: number;
-  paid: number;
-  balance: number;
+  paid: number; // payments received minus refunds
+  credited: number; // approved credit notes
+  balance: number; // still owed
+  refundDue: number; // owed back to the customer
   status: InvoiceStatusValue;
   daysOverdue: number;
   ebmReceiptNumber: string;
   payments: PaymentRecord[];
+  refunds: RefundRecord[];
+  creditNotes: CreditNoteDTO[];
+  /** Invoiced lines, with quantity already on approved or pending credit notes. */
+  lines: { orderLineId: string; productName: string; quantity: number; unitPrice: number; creditedQuantity: number }[];
 }
 
 export interface AgingTotals {
@@ -486,3 +544,35 @@ export interface CustomerOption {
 
 /** priceListId -> productId -> unit price, for showing customer-specific prices in forms. */
 export type PriceBook = Record<string, Record<string, number>>;
+
+export interface RouteDTO {
+  id: string;
+  name: string;
+  salespersonId: string;
+  salesperson: string;
+  weekday: number; // 1 = Monday ... 7 = Sunday
+  frequency: 'WEEKLY' | 'BIWEEKLY';
+  startDate: string;
+  notes: string;
+  customers: { id: string; name: string; area: string }[];
+}
+
+export interface RoutePlanStop {
+  salespersonId: string;
+  salesperson: string;
+  customerId: string;
+  customerName: string;
+  area: string;
+  routeName: string;
+  visited: boolean;
+}
+
+export interface RepCompliance {
+  salespersonId: string;
+  salesperson: string;
+  planned: number;
+  visited: number;
+  offRoute: number;
+  pct: number;
+  missed: { date: string; customerName: string; routeName: string }[];
+}

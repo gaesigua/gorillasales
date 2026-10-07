@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
@@ -27,9 +27,11 @@ interface SalesEntryFormProps {
   customers: CustomerOption[];
   priceBook: PriceBook;
   today: string;
+  /** Pre-fill from a route stop; `nonce` changes on every click so the same stop can be picked again. */
+  preset?: { customerId: string; salespersonId: string; nonce: number } | null;
 }
 
-export default function SalesEntryForm({ customers, priceBook, today }: SalesEntryFormProps) {
+export default function SalesEntryForm({ customers, priceBook, today, preset }: SalesEntryFormProps) {
   const router = useRouter();
   const { config } = useConfig();
   const { currentUser, canViewAllReps } = useUser();
@@ -51,8 +53,15 @@ export default function SalesEntryForm({ customers, priceBook, today }: SalesEnt
     handleSubmit,
     watch,
     reset,
+    setValue,
     formState: { errors },
   } = useForm<VisitFormData>({ defaultValues: emptyForm });
+
+  useEffect(() => {
+    if (!preset) return;
+    setValue('customerId', preset.customerId);
+    if (canViewAllReps) setValue('salespersonId', preset.salespersonId);
+  }, [preset, setValue, canViewAllReps]);
 
   const selectedCustomer = customers.find((c) => c.id === watch('customerId'));
   const priceFor = (productId: string) =>

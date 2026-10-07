@@ -1,5 +1,5 @@
 import { requirePageSession } from '@/lib/tenant';
-import { agingOf, listInvoices } from '@/lib/data/receivables';
+import { agingOf, listCreditNotes, listInvoices } from '@/lib/data/receivables';
 import { addDaysToDate, todayKigali } from '@/lib/dates';
 import type { Invoice } from '@/lib/types';
 import ReceivablesClient from './components/ReceivablesClient';
@@ -16,9 +16,10 @@ export default async function ReceivablesPage({ searchParams }: PageProps) {
   const today = todayKigali();
 
   // Every invoice with a balance, plus everything issued in the last 180 days
-  const [open, recent] = await Promise.all([
+  const [open, recent, creditNotes] = await Promise.all([
     listInvoices(session, today, { openOnly: true }),
     listInvoices(session, today, { from: addDaysToDate(today, -RECENT_DAYS), limit: 3000 }),
+    listCreditNotes(session, { limit: 300 }),
   ]);
   const byId = new Map<string, Invoice>();
   [...open, ...recent].forEach((i) => byId.set(i.id, i));
@@ -28,6 +29,7 @@ export default async function ReceivablesPage({ searchParams }: PageProps) {
     <ReceivablesClient
       invoices={invoices}
       aging={agingOf(open, today)}
+      creditNotes={creditNotes}
       today={today}
       initialCustomerId={params.customer ?? ''}
       initialSearch={params.q ?? ''}

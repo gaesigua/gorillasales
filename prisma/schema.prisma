@@ -43,6 +43,25 @@ enum DocumentType {
   PAYMENT
   ROAST_RUN
   DELIVERY_RUN
+  CREDIT_NOTE
+  REFUND
+}
+
+enum RouteFrequency {
+  WEEKLY
+  BIWEEKLY // every other week, counted from the route's start date
+}
+
+enum CreditNoteStatus {
+  PENDING_APPROVAL
+  APPROVED // issued: reduces the invoice balance
+  REJECTED
+}
+
+enum ReturnDisposition {
+  RESTOCK // goods came back resellable: returned into the batches they were delivered from
+  WRITE_OFF // goods came back damaged/expired and are discarded
+  NOT_RETURNED // credit without goods coming back (pricing error, goodwill, short delivery claim)
 }
 
 enum ProductKind {
@@ -57,6 +76,7 @@ enum StockMovementType {
   DISPATCH // loaded onto a delivery run
   RETURN // brought back from a failed delivery stop
   DELIVERY // delivered directly from the warehouse (no run)
+  CUSTOMER_RETURN // resellable goods returned by a customer (approved credit note)
   ADJUSTMENT // stock count correction, damage, samples
 }
 
@@ -127,6 +147,9 @@ model Organization {
   stockMovements    StockMovement[]
   roastRuns         RoastRun[]
   deliveryRuns      DeliveryRun[]
+  routes            Route[]
+  creditNotes       CreditNote[]
+  refunds           Refund[]
 
   @@map("organizations")
 }
@@ -160,6 +183,7 @@ model User {
   ordersCreated     SalesOrder[]    @relation("OrderCreatedBy")
   paymentsReceived  Payment[]       @relation("PaymentReceivedBy")
   deliveryRuns      DeliveryRun[]   @relation("RunDriver")
+  routes            Route[]
   stockMovements    StockMovement[]
 
   @@index([organizationId])
@@ -207,6 +231,9 @@ model Customer {
   salesOrders SalesOrder[]
   invoices    Invoice[]
   payments    Payment[]
+  routeStops  RouteStop[]
+  creditNotes CreditNote[]
+  refunds     Refund[]
 
   @@unique([organizationId, code])
   @@index([organizationId])
@@ -447,8 +474,9 @@ model SalesOrderLine {
   unitWeightKg Float   @default(0) // product weight per unit at time of order
   lineTotal    Decimal @db.Decimal(14, 2) // quantity x unitPrice
 
-  order   SalesOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  product Product    @relation(fields: [productId], references: [id], onDelete: Restrict)
+  order       SalesOrder       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product     Product          @relation(fields: [productId], references: [id], onDelete: Restrict)
+  creditLines CreditNoteLine[]
 
   @@index([orderId])
   @@index([productId])
@@ -478,6 +506,7 @@ model Invoice {
   order        SalesOrder   @relation(fields: [orderId], references: [id], onDelete: Restrict)
   customer     Customer     @relation(fields: [customerId], references: [id], onDelete: Restrict)
   payments     Payment[]
+  creditNotes  CreditNote[]
 
   @@unique([organizationId, invoiceNumber])
   @@index([organizationId, dueDate])
@@ -587,6 +616,7 @@ model StockMovement {
   orderId        String?
   roastRunId     String?
   deliveryRunId  String?
+  creditNoteId   String?
   reason         String?
   createdById    String
   createdAt      DateTime          @default(now())
@@ -594,6 +624,7 @@ model StockMovement {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   batch        StockBatch   @relation(fields: [batchId], references: [id], onDelete: Restrict)
   order        SalesOrder?  @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  creditNote   CreditNote?  @relation(fields: [creditNoteId], references: [id], onDelete: Restrict)
   roastRun     RoastRun?    @relation(fields: [roastRunId], references: [id], onDelete: Restrict)
   deliveryRun  DeliveryRun? @relation(fields: [deliveryRunId], references: [id], onDelete: Restrict)
   createdBy    User         @relation(fields: [createdById], references: [id], onDelete: Restrict)
@@ -654,6 +685,119 @@ model DeliveryRun {
   @@index([organizationId, runDate])
   @@index([driverId])
   @@map("delivery_runs")
+}
+
+// ==========================================
+// 5d. ROUTES (BEAT PLANS), RETURNS & CREDIT NOTES
+// ==========================================
+
+/// A rep's recurring visit plan: these customers, on this weekday, every week or every other week.
+model Route {
+  id             String         @id @default(cuid())
+  organizationId String
+  name           String // e.g. "Remera Monday"
+  salespersonId  String
+  weekday        Int // 1 = Monday ... 7 = Sunday (ISO)
+  frequency      RouteFrequency @default(WEEKLY)
+  startDate      DateTime       @db.Date // first visit day; anchors fortnightly routes
+  notes          String?
+  isActive       Boolean        @default(true)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  salesperson  User         @relation(fields: [salespersonId], references: [id], onDelete: Restrict)
+  stops        RouteStop[]
+
+  @@unique([organizationId, name])
+  @@index([salespersonId])
+  @@map("routes")
+}
+
+model RouteStop {
+  id         String @id @default(cuid())
+  routeId    String
+  customerId String
+  sortOrder  Int    @default(0)
+
+  route    Route    @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@unique([routeId, customerId])
+  @@map("route_stops")
+}
+
+/// Credit against an invoice (returned goods or a correction). Only APPROVED notes count:
+/// invoice balance = total - approved credits - (payments - refunds).
+model CreditNote {
+  id               String           @id @default(cuid())
+  organizationId   String
+  creditNoteNumber String? // e.g. CN-000012, assigned on approval so issued numbers have no gaps
+  invoiceId        String
+  customerId       String
+  status           CreditNoteStatus @default(PENDING_APPROVAL)
+  reason           String
+  issueDate        DateTime?        @db.Date // approval date
+  subtotal         Decimal          @db.Decimal(14, 2)
+  vatAmount        Decimal          @db.Decimal(14, 2)
+  total            Decimal          @db.Decimal(14, 2)
+  createdById      String
+  approvedById     String?
+  approvedAt       DateTime?
+  rejectedReason   String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  invoice        Invoice          @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+  customer       Customer         @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  lines          CreditNoteLine[]
+  refunds        Refund[]
+  stockMovements StockMovement[]
+
+  @@unique([organizationId, creditNoteNumber])
+  @@index([invoiceId])
+  @@index([organizationId, status])
+  @@map("credit_notes")
+}
+
+model CreditNoteLine {
+  id           String            @id @default(cuid())
+  creditNoteId String
+  orderLineId  String
+  quantity     Decimal           @db.Decimal(12, 3)
+  unitPrice    Decimal           @db.Decimal(14, 2) // as charged on the original order line
+  lineTotal    Decimal           @db.Decimal(14, 2)
+  disposition  ReturnDisposition
+
+  creditNote CreditNote     @relation(fields: [creditNoteId], references: [id], onDelete: Cascade)
+  orderLine  SalesOrderLine @relation(fields: [orderLineId], references: [id], onDelete: Restrict)
+
+  @@index([orderLineId])
+  @@map("credit_note_lines")
+}
+
+/// Money paid back to a customer when credit exceeds what they still owed on the invoice.
+model Refund {
+  id             String        @id @default(cuid())
+  organizationId String
+  refundNumber   String // e.g. RF-000004
+  creditNoteId   String
+  customerId     String
+  amount         Decimal       @db.Decimal(14, 2)
+  method         PaymentMethod
+  reference      String?
+  paidOn         DateTime      @db.Date
+  paidById       String
+  createdAt      DateTime      @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  creditNote   CreditNote   @relation(fields: [creditNoteId], references: [id], onDelete: Restrict)
+  customer     Customer     @relation(fields: [customerId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, refundNumber])
+  @@index([creditNoteId])
+  @@map("refunds")
 }
 
 // ==========================================

@@ -57,7 +57,7 @@ Built with Next.js 15 (App Router, Server Actions), Prisma and PostgreSQL.
 | `npm run build` | Production build (fails on type errors) |
 | `npm start` | Run the production build |
 | `npm run type-check` | TypeScript check |
-| `npm test` | Unit tests (VAT, credit control, aging, commission, FIFO stock, roast yield) |
+| `npm test` | Unit tests (VAT, credit control, aging, credit notes, commission, FIFO stock, roast yield, routes) |
 | `npm run db:migrate` | Create a migration after changing `prisma/schema.prisma` (development) |
 | `npm run db:deploy` | Apply pending migrations (use this in production) |
 | `npm run db:seed` | Load demo data |
@@ -122,6 +122,24 @@ order with an invoice (and a cash payment if the visit was marked Paid).
 
 After upgrading an existing database, **record opening stock** (Inventory → Receive Stock)
 before delivering orders: the migration creates a default "Main Warehouse" with no stock.
+
+## Routes, returns and credit notes
+
+- **Routes** (Routes screen, managers): each rep has named routes, a list of their own (or
+  unassigned) customers visited on a weekday, every week or every other week. Reps see
+  **Today's route** on Daily Sales Entry (tap a customer to log the visit). The Routes screen
+  shows **visit compliance** per rep: planned stops visited on the planned day, this week and
+  over the last 4 weeks, with the missed visits listed.
+- **Credit notes** (Receivables → open an invoice → "Return / credit…"): anyone who can see
+  the invoice can request credit for specific lines, marking each as returned resellable
+  (goes back into the batches it was delivered from), returned damaged (written off), or no
+  goods returned (price or quantity correction). A request changes nothing until a **manager
+  approves** it; it is then numbered (`CN-000123`) and reduces the invoice balance.
+  Crediting everything still open is how an invoice is cancelled.
+- **Refunds**: if a credited invoice had already been paid, it shows **Refund due**; managers
+  record the refund (`RF-000045`) with method and reference.
+- Sales figures (dashboard, targets, commission, reports) are **net of approved credit
+  notes**, counted in the month the credit note is issued.
 
 ## Access rules
 

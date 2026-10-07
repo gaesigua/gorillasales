@@ -6,28 +6,30 @@ import { Search } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
 import { formatRWF, formatRWFFull } from '@/lib/format';
 import { AGING_LABELS, type AgingBucket } from '@/lib/domain/receivables';
-import type { AgingTotals, Invoice } from '@/lib/types';
+import { CREDIT_NOTE_STATUS_LABELS, type AgingTotals, type CreditNoteDTO, type Invoice } from '@/lib/types';
 import InvoiceDrawer from './InvoiceDrawer';
 import InvoiceStatusBadge from './InvoiceStatusBadge';
 
-type Tab = 'OPEN' | 'OVERDUE' | 'PAID' | 'ALL';
+type Tab = 'OPEN' | 'OVERDUE' | 'PAID' | 'ALL' | 'CREDITS';
 const TABS: { value: Tab; label: string }[] = [
   { value: 'OPEN', label: 'Open' },
   { value: 'OVERDUE', label: 'Overdue' },
   { value: 'PAID', label: 'Paid' },
   { value: 'ALL', label: 'All (180 days)' },
+  { value: 'CREDITS', label: 'Credit notes' },
 ];
 const BUCKETS: AgingBucket[] = ['current', 'd1_30', 'd31_60', 'd61_90', 'd90_plus'];
 
 interface ReceivablesClientProps {
   invoices: Invoice[];
   aging: AgingTotals;
+  creditNotes: CreditNoteDTO[];
   today: string;
   initialCustomerId: string;
   initialSearch: string;
 }
 
-export default function ReceivablesClient({ invoices: initial, aging, today, initialCustomerId, initialSearch }: ReceivablesClientProps) {
+export default function ReceivablesClient({ invoices: initial, aging, creditNotes, today, initialCustomerId, initialSearch }: ReceivablesClientProps) {
   const router = useRouter();
   const [invoices, setInvoices] = useState(initial);
   useEffect(() => setInvoices(initial), [initial]);
@@ -172,7 +174,53 @@ export default function ReceivablesClient({ invoices: initial, aging, today, ini
         </div>
       </div>
 
-      <div className="bg-card border border-border rounded-xl overflow-x-auto">
+      {tab === 'CREDITS' && (
+        <div className="bg-card border border-border rounded-xl overflow-x-auto">
+          <table className="w-full text-sm min-w-[900px]">
+            <thead className="bg-muted/40 text-[11px] uppercase tracking-wider text-muted-foreground">
+              <tr>
+                <th className="text-left px-4 py-3">Credit note</th>
+                <th className="text-left px-4 py-3">Invoice</th>
+                <th className="text-left px-4 py-3">Customer</th>
+                <th className="text-left px-4 py-3">Reason</th>
+                <th className="text-left px-4 py-3">Requested</th>
+                <th className="text-right px-4 py-3">Credit</th>
+                <th className="text-left px-4 py-3">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {creditNotes.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">
+                    No credit notes yet. Open an invoice and choose “Return / credit…”.
+                  </td>
+                </tr>
+              )}
+              {creditNotes.map((cn) => (
+                <tr
+                  key={cn.id}
+                  onClick={() => invoices.some((i) => i.id === cn.invoiceId) && setSelectedId(cn.invoiceId)}
+                  className="hover:bg-muted/40 cursor-pointer"
+                >
+                  <td className="px-4 py-3 font-mono">{cn.creditNoteNumber || '—'}</td>
+                  <td className="px-4 py-3 font-mono">{cn.invoiceNumber}</td>
+                  <td className="px-4 py-3">{cn.customerName}</td>
+                  <td className="px-4 py-3 text-muted-foreground max-w-[260px] truncate">{cn.reason}</td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    {cn.requestedOn} · {cn.requestedBy}
+                  </td>
+                  <td className="px-4 py-3 text-right font-tabular">{formatRWFFull(cn.total)}</td>
+                  <td className={`px-4 py-3 ${cn.status === 'PENDING_APPROVAL' ? 'text-warning font-semibold' : cn.status === 'REJECTED' ? 'text-negative' : ''}`}>
+                    {CREDIT_NOTE_STATUS_LABELS[cn.status]}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <div className={`bg-card border border-border rounded-xl overflow-x-auto ${tab === 'CREDITS' ? 'hidden' : ''}`}>
         <table className="w-full text-sm min-w-[1000px]">
           <thead className="bg-muted/40 text-[11px] uppercase tracking-wider text-muted-foreground">
             <tr>
@@ -221,7 +269,7 @@ export default function ReceivablesClient({ invoices: initial, aging, today, ini
       </div>
 
       {selected && (
-        <InvoiceDrawer key={selected.id + selected.paid} invoice={selected} today={today} onClose={() => setSelectedId(null)} onUpdated={replace} />
+        <InvoiceDrawer key={`${selected.id}|${selected.paid}|${selected.credited}|${selected.creditNotes.map((c) => c.status).join()}`} invoice={selected} today={today} onClose={() => setSelectedId(null)} onUpdated={replace} />
       )}
     </div>
   );

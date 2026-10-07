@@ -8,7 +8,7 @@ import { MONTH_LONG as MONTHS } from '@/lib/dates';
 import { needsFollowUp } from '@/lib/visitRules';
 import { useUser } from '@/context/UserContext';
 import { calculateCommission } from '@/lib/domain/commission';
-import type { CommissionRule, Order, RepMonthlyTarget, SalespersonItem, VisitLog } from '@/lib/types';
+import type { CreditNoteDTO, CommissionRule, Order, RepMonthlyTarget, SalespersonItem, VisitLog } from '@/lib/types';
 
 // Per-rep monthly targets are managed via Admin Config → Monthly Targets tab
 
@@ -35,7 +35,8 @@ function buildMonthlyPerf(
   visits: VisitLog[],
   orders: Order[],
   targets: RepMonthlyTarget[],
-  rules: CommissionRule[]
+  rules: CommissionRule[],
+  credits: CreditNoteDTO[]
 ): RepPerf[] {
   // Include reps who are no longer active but still have activity or targets this month
   const repMap = new Map(reps.map((r) => [r.id, r.label]));
@@ -48,10 +49,12 @@ function buildMonthlyPerf(
     const repOrders = orders.filter((o) => o.salespersonId === id);
     const repTarget = targets.find((t) => t.salespersonId === id);
 
-    const actualSales = repOrders.reduce((s, o) => s + o.total, 0);
+    // Net sales: orders minus credit notes issued this month for this rep's orders
+    const credited = credits.filter((c) => c.salespersonId === id).reduce((s, c) => s + c.total, 0);
+    const actualSales = Math.round((repOrders.reduce((s, o) => s + o.total, 0) - credited) * 100) / 100;
     const actualKg = Math.round(repOrders.reduce((s, o) => s + o.weightKg, 0) * 100) / 100;
     const paidSales = repOrders.reduce((s, o) => s + o.amountPaid, 0);
-    const creditSales = repOrders.filter((o) => o.invoiceId).reduce((s, o) => s + (o.total - o.amountPaid), 0);
+    const creditSales = repOrders.filter((o) => o.invoiceId).reduce((s, o) => s + Math.max(0, o.total - o.creditedAmount - o.amountPaid), 0);
     const target = repTarget?.targetAmount ?? 0;
     const targetKg = repTarget?.targetWeightKg ?? 0;
     const achievementPct = target > 0 ? Math.round((actualSales / target) * 100 * 10) / 10 : 0;
@@ -104,9 +107,10 @@ interface MonthlyTargetsClientProps {
   orders: Order[];
   targets: RepMonthlyTarget[];
   commissionRules: CommissionRule[];
+  credits: CreditNoteDTO[];
 }
 
-export default function MonthlyTargetsClient({ month, year, years, reps, visits, orders, targets, commissionRules }: MonthlyTargetsClientProps) {
+export default function MonthlyTargetsClient({ month, year, years, reps, visits, orders, targets, commissionRules, credits }: MonthlyTargetsClientProps) {
   const router = useRouter();
   const { currentUser, canViewAllReps } = useUser();
   const selectedMonth = month;
@@ -116,8 +120,8 @@ export default function MonthlyTargetsClient({ month, year, years, reps, visits,
   const selectPeriod = (m: number, y: number) => router.push(`/monthly-targets?month=${m}&year=${y}`);
 
   const perfData = useMemo(
-    () => buildMonthlyPerf(reps, visits, orders, targets, commissionRules),
-    [reps, visits, orders, targets, commissionRules]
+    () => buildMonthlyPerf(reps, visits, orders, targets, commissionRules, credits),
+    [reps, visits, orders, targets, commissionRules, credits]
   );
 
   // The server only sends a sales officer their own visits and targets

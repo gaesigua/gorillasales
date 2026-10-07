@@ -8,6 +8,8 @@ const VARIANTS: Record<InvoiceStatusValue, 'success' | 'warning' | 'info' | 'err
   UNPAID: 'warning',
   OVERDUE: 'error',
   VOID: 'neutral',
+  CREDITED: 'neutral',
+  REFUND_DUE: 'warning',
 };
 
 export default function InvoiceStatusBadge({ status }: { status: InvoiceStatusValue }) {

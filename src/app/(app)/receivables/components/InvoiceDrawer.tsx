@@ -9,6 +9,7 @@ import { canSetEbmNumber } from '@/lib/roles';
 import { formatRWFFull } from '@/lib/format';
 import { PAYMENT_METHOD_LABELS, type Invoice, type PaymentMethodValue } from '@/lib/types';
 import InvoiceStatusBadge from './InvoiceStatusBadge';
+import CreditNotesSection from './CreditNotesSection';
 
 interface InvoiceDrawerProps {
   invoice: Invoice;
@@ -97,8 +98,20 @@ export default function InvoiceDrawer({ invoice, today, onClose, onUpdated }: In
             <dd className="font-tabular">{formatRWFFull(invoice.vatAmount)}</dd>
             <dt className="font-semibold">Total</dt>
             <dd className="font-tabular font-semibold">{formatRWFFull(invoice.total)}</dd>
-            <dt className="text-muted-foreground">Paid</dt>
+            <dt className="text-muted-foreground">Paid (net of refunds)</dt>
             <dd className="font-tabular">{formatRWFFull(invoice.paid)}</dd>
+            {invoice.credited > 0 && (
+              <>
+                <dt className="text-muted-foreground">Credited</dt>
+                <dd className="font-tabular">−{formatRWFFull(invoice.credited)}</dd>
+              </>
+            )}
+            {invoice.refundDue > 0 && (
+              <>
+                <dt className="font-semibold text-warning">Refund due to customer</dt>
+                <dd className="font-tabular font-bold text-warning">{formatRWFFull(invoice.refundDue)}</dd>
+              </>
+            )}
             <dt className="font-semibold">Balance due</dt>
             <dd className="font-tabular font-bold">{formatRWFFull(invoice.balance)}</dd>
           </dl>
@@ -175,6 +188,8 @@ export default function InvoiceDrawer({ invoice, today, onClose, onUpdated }: In
               </button>
             </fieldset>
           )}
+
+          <CreditNotesSection invoice={invoice} today={today} onUpdated={onUpdated} />
 
           <fieldset className="border border-border rounded-lg p-4 space-y-2">
             <legend className="px-1 text-sm font-semibold">EBM receipt</legend>

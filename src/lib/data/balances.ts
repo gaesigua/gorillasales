@@ -6,7 +6,7 @@ import { stringToDateColumn } from '@/lib/dates';
 import { toNumber } from '@/lib/domain/money';
 
 export interface CustomerBalance {
-  outstanding: number; // unpaid amount on issued, non-voided invoices
+  outstanding: number; // still owed on issued invoices, after approved credit notes and refunds
   overdue: number; // part of outstanding that is past its due date
   openOrders: number; // value of held/confirmed orders not yet invoiced
 }
@@ -27,16 +27,23 @@ export async function getCustomerBalances(
 
   const [invoiceRows, openOrders] = await Promise.all([
     prisma.$queryRaw<{ customerId: string; outstanding: Prisma.Decimal; overdue: Prisma.Decimal }[]>`
-      SELECT i."customerId",
-             SUM(i."total" - COALESCE(p.paid, 0)) AS outstanding,
-             SUM(CASE WHEN i."dueDate" < ${stringToDateColumn(today)} THEN i."total" - COALESCE(p.paid, 0) ELSE 0 END) AS overdue
-      FROM "invoices" i
-      LEFT JOIN (SELECT "invoiceId", SUM("amount") AS paid FROM "payments" GROUP BY "invoiceId") p ON p."invoiceId" = i."id"
-      WHERE i."organizationId" = ${organizationId}
-        AND i."voidedAt" IS NULL
-        AND i."total" > COALESCE(p.paid, 0)
-        ${customerFilter}
-      GROUP BY i."customerId"`,
+      WITH settled AS (
+        SELECT i."id", i."customerId", i."dueDate",
+               i."total" - COALESCE(c.credited, 0) - (COALESCE(p.paid, 0) - COALESCE(r.refunded, 0)) AS due
+        FROM "invoices" i
+        LEFT JOIN (SELECT "invoiceId", SUM("amount") AS paid FROM "payments" GROUP BY "invoiceId") p ON p."invoiceId" = i."id"
+        LEFT JOIN (SELECT "invoiceId", SUM("total") AS credited FROM "credit_notes" WHERE "status" = 'APPROVED' GROUP BY "invoiceId") c
+          ON c."invoiceId" = i."id"
+        LEFT JOIN (SELECT cn."invoiceId", SUM(rf."amount") AS refunded FROM "refunds" rf
+                   JOIN "credit_notes" cn ON cn."id" = rf."creditNoteId" GROUP BY cn."invoiceId") r ON r."invoiceId" = i."id"
+        WHERE i."organizationId" = ${organizationId} AND i."voidedAt" IS NULL ${customerFilter}
+      )
+      SELECT "customerId",
+             SUM(due) AS outstanding,
+             SUM(CASE WHEN "dueDate" < ${stringToDateColumn(today)} THEN due ELSE 0 END) AS overdue
+      FROM settled
+      WHERE due > 0
+      GROUP BY "customerId"`,
     prisma.salesOrder.groupBy({
       by: ['customerId'],
       where: {

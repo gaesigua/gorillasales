@@ -54,6 +54,23 @@ export async function listOverdueFollowUps(session: UserSession): Promise<Overdu
     .sort((a, b) => b.daysOverdue - a.daysOverdue);
 }
 
+/**
+ * Approved credit notes per rep (the original order's salesperson) issued in [gte, lt).
+ * Sales figures are net of these: returns and corrections count in the month they are issued.
+ */
+async function creditsByRep(organizationId: string, range: { gte: Date; lt: Date }, repId?: string): Promise<Map<string, number>> {
+  const rows = await prisma.$queryRaw<{ salespersonId: string; total: Prisma.Decimal }[]>`
+    SELECT o."salespersonId", SUM(cn."total") AS total
+    FROM "credit_notes" cn
+    JOIN "invoices" i ON i."id" = cn."invoiceId"
+    JOIN "sales_orders" o ON o."id" = i."orderId"
+    WHERE cn."organizationId" = ${organizationId} AND cn."status" = 'APPROVED'
+      AND cn."issueDate" >= ${range.gte} AND cn."issueDate" < ${range.lt}
+      ${repId ? Prisma.sql`AND o."salespersonId" = ${repId}` : Prisma.empty}
+    GROUP BY o."salespersonId"`;
+  return new Map(rows.map((r) => [r.salespersonId, toNumber(r.total)]));
+}
+
 /** Target vs actual per sales officer for one month (sales officers only get their own row). */
 export async function getRepPerformance(
   session: UserSession,
@@ -69,7 +86,7 @@ export async function getRepPerformance(
   const orderDate = dateOfVisit;
   const activeOrders: Prisma.SalesOrderWhereInput = { organizationId, orderDate, status: { not: 'CANCELLED' }, ...repWhere };
 
-  const [reps, targets, sales, visits, kgRows, newCustomers, overdueList] = await Promise.all([
+  const [reps, targets, sales, visits, kgRows, newCustomers, overdueList, credits] = await Promise.all([
     prisma.user.findMany({
       where: {
         organizationId,
@@ -100,12 +117,13 @@ export async function getRepPerformance(
       _count: { _all: true },
     }),
     overdue ? Promise.resolve(overdue) : listOverdueFollowUps(session),
+    creditsByRep(organizationId, dateOfVisit, repId),
   ]);
 
   return reps.map((rep) => {
     const target = targets.find((t) => t.salespersonId === rep.id);
     const sale = sales.find((s) => s.salespersonId === rep.id);
-    const actualSales = toNumber(sale?._sum.total);
+    const actualSales = Math.round((toNumber(sale?._sum.total) - (credits.get(rep.id) ?? 0)) * 100) / 100;
     const targetAmount = toNumber(target?.targetAmount);
     return {
       salespersonId: rep.id,
@@ -135,7 +153,7 @@ async function getSalesTrend(session: UserSession, year: number, month: number):
 
   return Promise.all(
     months.map(async (m) => {
-      const [actual, target] = await Promise.all([
+      const [actual, target, credits] = await Promise.all([
         prisma.salesOrder.aggregate({
           where: { organizationId, orderDate: monthDateRange(m.year, m.month), status: { not: 'CANCELLED' }, ...repWhere },
           _sum: { total: true },
@@ -144,11 +162,12 @@ async function getSalesTrend(session: UserSession, year: number, month: number):
           where: { organizationId, year: m.year, month: m.month, ...repWhere },
           _sum: { targetAmount: true },
         }),
+        creditsByRep(organizationId, monthDateRange(m.year, m.month), repId),
       ]);
       return {
         month: `${MONTH_SHORT[m.month]} ${String(m.year).slice(2)}`,
         target: toNumber(target._sum.targetAmount),
-        actual: toNumber(actual._sum.total),
+        actual: toNumber(actual._sum.total) - [...credits.values()].reduce((t, c) => t + c, 0),
       };
     })
   );

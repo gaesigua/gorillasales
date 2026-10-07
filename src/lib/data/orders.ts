@@ -12,7 +12,14 @@ export const orderInclude = {
   customer: { select: { name: true, area: true, phone: true, contactPerson: true, sector: true, district: true } },
   salesperson: { select: { name: true } },
   lines: { include: { product: { select: { name: true } } }, orderBy: { id: 'asc' } },
-  invoice: { select: { id: true, invoiceNumber: true, payments: { select: { amount: true } } } },
+  invoice: {
+    select: {
+      id: true,
+      invoiceNumber: true,
+      payments: { select: { amount: true } },
+      creditNotes: { where: { status: 'APPROVED' }, select: { total: true, refunds: { select: { amount: true } } } },
+    },
+  },
   deliveryRun: { select: { id: true, runNumber: true, status: true } },
 } satisfies Prisma.SalesOrderInclude;
 
@@ -50,7 +57,11 @@ export function toOrderDTO(o: OrderRow): Order {
     lines,
     invoiceId: o.invoice?.id ?? '',
     invoiceNumber: o.invoice?.invoiceNumber ?? '',
-    amountPaid: (o.invoice?.payments ?? []).reduce((s, p) => s + toNumber(p.amount), 0),
+    // Net of refunds paid back to the customer
+    amountPaid:
+      (o.invoice?.payments ?? []).reduce((s, p) => s + toNumber(p.amount), 0) -
+      (o.invoice?.creditNotes ?? []).reduce((s, cn) => s + cn.refunds.reduce((t, r) => t + toNumber(r.amount), 0), 0),
+    creditedAmount: (o.invoice?.creditNotes ?? []).reduce((s, cn) => s + toNumber(cn.total), 0),
     deliveryRunId: o.deliveryRun?.id ?? '',
     deliveryRunNumber: o.deliveryRun?.runNumber ?? '',
     deliveryRunStatus: o.deliveryRun?.status ?? null,

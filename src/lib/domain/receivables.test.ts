@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { agingBucket, invoiceBalance, invoiceStatus, summarizeAging } from './receivables';
+import { agingBucket, invoiceBalance, invoiceStatus, refundDue, summarizeAging } from './receivables';
 
 const today = '2026-10-07';
 
@@ -51,5 +51,28 @@ describe('summarizeAging', () => {
       today
     );
     expect(s).toEqual({ current: 1000, d1_30: 300, d31_60: 0, d61_90: 0, d90_plus: 300, total: 1600, overdue: 600 });
+  });
+});
+
+describe('credit notes and refunds', () => {
+  it('credit reduces the balance', () => {
+    const inv = { total: 1000, paid: 0, credited: 300, dueDate: '2026-10-20' };
+    expect(invoiceBalance(inv)).toBe(700);
+    expect(invoiceStatus(inv, today)).toBe('PARTIAL');
+  });
+  it('fully credited and unpaid is CREDITED', () => {
+    expect(invoiceStatus({ total: 1000, paid: 0, credited: 1000, dueDate: '2026-01-01' }, today)).toBe('CREDITED');
+  });
+  it('paid then credited means a refund is due', () => {
+    const inv = { total: 1000, paid: 1000, credited: 400, dueDate: '2026-01-01' };
+    expect(refundDue(inv)).toBe(400);
+    expect(invoiceBalance(inv)).toBe(0);
+    expect(invoiceStatus(inv, today)).toBe('REFUND_DUE');
+  });
+  it('after the refund the invoice is settled', () => {
+    expect(invoiceStatus({ total: 1000, paid: 600, credited: 400, dueDate: '2026-01-01' }, today)).toBe('PAID');
+  });
+  it('credited balances are excluded from aging', () => {
+    expect(summarizeAging([{ total: 1000, paid: 0, credited: 1000, dueDate: '2026-01-01' }], today).total).toBe(0);
   });
 });

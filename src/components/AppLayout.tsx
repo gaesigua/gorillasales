@@ -7,6 +7,8 @@ import { useUser } from '@/context/UserContext';
 import { useOffline } from '@/context/OfflineContext';
 import { logoutAction } from '@/actions/auth';
 import { ROLE_LABELS, WAREHOUSE_ROLES, type Role } from '@/lib/roles';
+import { APP_VERSION, COMPANY } from '@/lib/company';
+import BrandMark from '@/components/brand/BrandMark';
 
 interface Tab {
   label: string;
@@ -44,13 +46,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="bg-brand text-white">
-        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-4 py-2">
-          <div>
-            <Link href="/dashboard" className="text-white no-underline font-bold text-lg">
+      <header className="bg-brand text-white border-b-4 border-gold">
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-4 py-1.5">
+          <div className="flex items-center gap-2.5">
+            <Link href="/dashboard" className="flex items-center gap-2.5 text-white no-underline font-bold text-lg">
+              <BrandMark size={32} />
               GorillaSales
             </Link>
-            <span className="ml-3 text-sm text-white/80">{currentUser.organizationName}</span>
+            <span className="hidden text-sm text-gray-300 sm:inline">{currentUser.organizationName}</span>
           </div>
           <div className="text-sm">
             <span>
@@ -85,7 +88,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      <nav className="bg-brand-light border-b border-border px-2 pt-2" aria-label="Main">
+      <nav className="bg-gold-pale border-b border-border px-2 pt-2" aria-label="Main">
         <ul className="flex gap-1 overflow-x-auto sm:flex-wrap sm:overflow-visible">
           {tabs.map((t) => {
             const active = isActive(t.href);
@@ -95,7 +98,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   href={t.href}
                   aria-current={active ? 'page' : undefined}
                   className={`block whitespace-nowrap px-3 py-1.5 text-sm border border-b-0 border-border no-underline -mb-px ${
-                    active ? 'bg-white text-black font-bold' : 'bg-[#e9e2d8] text-link hover:bg-white'
+                    active ? 'bg-white text-black font-bold border-t-2 border-t-brand' : 'bg-gold-soft text-link hover:bg-white'
                   }`}
                 >
                   {t.label}
@@ -110,8 +113,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
       <main>{children}</main>
 
-      <footer className="no-print border-t border-border mt-8 px-4 py-3 text-xs text-muted-foreground">
-        GorillaSales · {currentUser.organizationName}
+      <footer className="no-print mt-8 border-t-4 border-gold bg-[#ececec] px-4 py-2 text-xs">
+        <p>
+          <Link href="/help">Help &amp; working offline</Link> | <Link href="/help#contacts">Contact your administrator</Link> |{' '}
+          <a href={COMPANY.website}>gorillascoffee.com</a>
+        </p>
+        <p className="mt-1 text-muted-foreground">
+          GorillaSales version {APP_VERSION} · {currentUser.organizationName} · © {new Date().getFullYear()} {COMPANY.name}
+        </p>
       </footer>
     </div>
   );

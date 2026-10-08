@@ -5,7 +5,7 @@ import '../styles/tailwind.css';
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  themeColor: '#4a2c17',
+  themeColor: '#111111',
 };
 
 export const metadata: Metadata = {

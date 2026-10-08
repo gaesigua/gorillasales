@@ -4,13 +4,17 @@
 
 /*
  * GorillaSales design system — "classic business web".
- * Black text on white, one coffee-brown brand colour, classic blue underlined links,
- * grey 1px borders, square corners, no shadows, gradients, blur or animation.
+ * Gorilla's Coffee brand: black and the packaging gold. Black text on white, classic blue
+ * underlined links, grey 1px borders, square corners, no shadows, gradients, blur or animation.
+ * Gold is a background behind black text or a stripe — never gold text on white (unreadable).
  * Red/green/amber only where they carry meaning (overdue, paid, warnings).
  */
 :root {
-  --brand: #4a2c17; /* coffee brown: header bar, primary buttons */
-  --brand-light: #efe6dc; /* tab bar, selected rows */
+  --brand: #111111; /* black: header bar, primary buttons */
+  --gold: #f0b323; /* packaging gold: logo tile, header stripe, active markers */
+  --gold-pale: #fbf1d6; /* tab bar, section heading bars */
+  --gold-soft: #f3e2ad; /* inactive tabs */
+  --brand-light: var(--gold-pale);
   --link: #0645ad;
   --link-visited: #0b0080;
 
@@ -41,8 +45,8 @@
   --info: #0645ad;
   --info-bg: #eaf0fb;
 
-  --table-head: #e4e0da;
-  --table-stripe: #f7f6f4;
+  --table-head: #ece6d6;
+  --table-stripe: #f8f7f3;
 }
 
 @layer base {
@@ -72,6 +76,13 @@
   h6,
   p {
     margin: 0;
+  }
+
+  /* Page titles inside the app get the brand's gold rule, like a classic portal heading */
+  main h1 {
+    display: inline-block;
+    border-bottom: 3px solid var(--gold);
+    padding-bottom: 1px;
   }
 
   h1 {

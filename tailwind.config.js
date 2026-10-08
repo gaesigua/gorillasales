@@ -28,6 +28,7 @@ module.exports = {
         background: 'var(--background)',
         foreground: 'var(--foreground)',
         brand: { DEFAULT: 'var(--brand)', light: 'var(--brand-light)' },
+        gold: { DEFAULT: 'var(--gold)', pale: 'var(--gold-pale)', soft: 'var(--gold-soft)' },
         link: 'var(--link)',
         primary: { DEFAULT: 'var(--primary)', foreground: 'var(--primary-foreground)' },
         secondary: { DEFAULT: 'var(--secondary)', foreground: 'var(--secondary-foreground)' },

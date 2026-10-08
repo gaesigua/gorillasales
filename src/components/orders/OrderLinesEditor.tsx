@@ -84,7 +84,7 @@ export default function OrderLinesEditor({
   return (
     <div className="space-y-3">
       <div className="overflow-x-auto">
-        <table ref={tableRef} className="w-full text-sm">
+        <table ref={tableRef} className="w-full text-sm max-sm:[&_thead]:hidden">
           <thead>
             <tr>
               <th className="text-left px-2 py-1">Product</th>
@@ -99,8 +99,8 @@ export default function OrderLinesEditor({
               const product = products.find((p) => p.id === l.productId);
               const price = effectivePrice(l);
               return (
-                <tr key={l.key}>
-                  <td className="p-1">
+                <tr key={l.key} className="max-sm:grid max-sm:grid-cols-4 max-sm:border max-sm:border-border max-sm:mb-2 max-sm:[&>td]:border-0">
+                  <td className="p-1 max-sm:col-span-4">
                     <select
                       className={cell}
                       value={l.productId}
@@ -116,6 +116,7 @@ export default function OrderLinesEditor({
                     </select>
                   </td>
                   <td className="p-1">
+                    <span className="block text-xs font-bold sm:hidden">Quantity</span>
                     <input
                       className={`${cell} text-right`}
                       type="number"
@@ -130,6 +131,7 @@ export default function OrderLinesEditor({
                     />
                   </td>
                   <td className="p-1">
+                    <span className="block text-xs font-bold sm:hidden">Price</span>
                     {canEditPrice ? (
                       <input
                         className={`${cell} text-right`}
@@ -148,9 +150,10 @@ export default function OrderLinesEditor({
                     )}
                   </td>
                   <td className="px-2 py-1 text-right font-tabular font-semibold">
+                    <span className="block text-xs font-bold sm:hidden">Total</span>
                     {l.productId && Number(l.quantity) > 0 ? (Number(l.quantity) * price).toLocaleString('en-US') : '—'}
                   </td>
-                  <td className="p-1 text-center">
+                  <td className="p-1 text-center max-sm:self-end">
                     <button
                       type="button"
                       onClick={() => onChange(lines.length > 1 ? lines.filter((x) => x.key !== l.key) : [emptyLine()])}

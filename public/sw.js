@@ -78,7 +78,7 @@ async function refreshFieldCopy() {
 const OFFLINE_HTML = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1"><title>Offline - GorillaSales</title>
 <style>body{margin:0;font:13px Verdana,Tahoma,sans-serif;color:#000;background:#fff}
-.h{background:#4a2c17;color:#fff;font-weight:bold;font-size:16px;padding:8px 16px}
+.h{background:#111;color:#fff;font-weight:bold;font-size:16px;padding:8px 16px;border-bottom:4px solid #f0b323}
 .b{padding:16px;max-width:560px}a{color:#0645ad}</style></head>
 <body><div class="h">GorillaSales</div><div class="b"><h1 style="font-size:18px">No connection</h1>
 <p>This page needs the internet. You can still log visits and orders on the

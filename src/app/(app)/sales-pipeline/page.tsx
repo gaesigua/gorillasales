@@ -4,6 +4,8 @@ import { getRepPerformance } from '@/lib/data/performance';
 import { currentKigaliMonth, todayKigali } from '@/lib/dates';
 import SalesPipelineClient from './components/SalesPipelineClient';
 
+export const metadata = { title: 'Pipeline' };
+
 export default async function SalesPipelinePage() {
   const session = await requirePageSession();
   const { month, year } = currentKigaliMonth();

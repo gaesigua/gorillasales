@@ -5,6 +5,8 @@ import { getRoutePlan } from '@/lib/data/routes';
 import { addDaysToDate, todayKigali } from '@/lib/dates';
 import DailySalesEntryClient from './components/DailySalesEntryClient';
 
+export const metadata = { title: 'Visits' };
+
 const RECENT_DAYS = 60;
 
 export default async function DailySalesEntryPage() {

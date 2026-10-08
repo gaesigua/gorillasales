@@ -3,7 +3,7 @@ import { requirePageSession } from '@/lib/tenant';
 import { ROLE_LABELS } from '@/lib/roles';
 import { APP_VERSION, COMPANY } from '@/lib/company';
 
-export const metadata = { title: 'Help — GorillaSales' };
+export const metadata = { title: 'Help' };
 
 export default async function HelpPage() {
   const session = await requirePageSession();

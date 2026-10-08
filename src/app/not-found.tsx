@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import PublicHeader from '@/components/brand/PublicHeader';
 
+export const metadata = { title: 'Page not found' };
+
 export default function NotFound() {
   return (
     <div className="min-h-screen bg-background">

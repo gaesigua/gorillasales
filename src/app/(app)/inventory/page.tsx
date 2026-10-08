@@ -3,6 +3,8 @@ import { getProductStock, listBatches, listMovements, listRoastRuns } from '@/li
 import { todayKigali } from '@/lib/dates';
 import InventoryClient from './components/InventoryClient';
 
+export const metadata = { title: 'Inventory' };
+
 export default async function InventoryPage() {
   const session = await requirePageSession();
   const today = todayKigali();

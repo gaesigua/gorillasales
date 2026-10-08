@@ -9,9 +9,12 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: 'GorillaSales — Coffee Field Sales CRM',
+  // Page name first, so it stays readable when browser tabs are narrow: "Orders · GorillaSales"
+  title: { default: "GorillaSales · Gorilla's Coffee", template: '%s · GorillaSales' },
   description:
-    'GorillaSales helps coffee distribution teams log daily visits, track pipeline deals, and monitor rep performance against monthly targets.',
+    "Gorilla's Coffee staff system for sales visits, orders, deliveries, stock and receivables.",
+  // A staff tool: keep it out of search results (customers should find gorillascoffee.com)
+  robots: { index: false, follow: false, nocache: true, googleBot: { index: false, follow: false } },
   icons: {
     icon: [{ url: '/favicon.ico', type: 'image/x-icon' }],
     apple: [{ url: '/icons/apple-touch-icon.png', sizes: '180x180' }],

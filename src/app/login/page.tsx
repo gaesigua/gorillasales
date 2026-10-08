@@ -3,6 +3,8 @@ import PublicHeader from '@/components/brand/PublicHeader';
 import PublicFooter from '@/components/brand/PublicFooter';
 import SignInForm from '@/components/auth/SignInForm';
 
+export const metadata = { title: 'Sign in' };
+
 export default function LoginPage() {
   return (
     <div className="flex min-h-screen flex-col bg-background">

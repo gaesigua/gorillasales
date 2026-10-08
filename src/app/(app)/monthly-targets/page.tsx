@@ -6,6 +6,8 @@ import { listVisits } from '@/lib/data/visits';
 import { monthLastDay, parsePeriodParams } from '@/lib/dates';
 import MonthlyTargetsClient from './components/MonthlyTargetsClient';
 
+export const metadata = { title: 'Targets' };
+
 interface PageProps {
   searchParams: Promise<{ month?: string; year?: string }>;
 }

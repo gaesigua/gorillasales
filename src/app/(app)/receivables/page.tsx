@@ -4,6 +4,8 @@ import { addDaysToDate, todayKigali } from '@/lib/dates';
 import type { Invoice } from '@/lib/types';
 import ReceivablesClient from './components/ReceivablesClient';
 
+export const metadata = { title: 'Receivables' };
+
 const RECENT_DAYS = 180;
 
 interface PageProps {

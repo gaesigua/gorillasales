@@ -6,6 +6,8 @@ import { addDaysToDate, todayKigali } from '@/lib/dates';
 import type { Order } from '@/lib/types';
 import OrdersClient from './components/OrdersClient';
 
+export const metadata = { title: 'Orders' };
+
 const RECENT_DAYS = 90;
 
 interface PageProps {

@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { invoiceScope, requirePageSession } from '@/lib/tenant';
@@ -7,6 +8,19 @@ import { formatRWFFull } from '@/lib/format';
 import { RETURN_DISPOSITION_LABELS } from '@/lib/types';
 import DocumentHeader from '@/components/print/DocumentHeader';
 import PrintBar from '@/components/print/PrintButton';
+
+// The title is printed at the top of the page and becomes the "Save as PDF" file name
+export async function generateMetadata({ params }: { params: Promise<{ creditNoteId: string }> }): Promise<Metadata> {
+  const session = await requirePageSession();
+  const { creditNoteId } = await params;
+  const cn = await prisma.creditNote.findFirst({
+    where: { id: creditNoteId, invoice: invoiceScope(session) },
+    select: { creditNoteNumber: true, invoice: { select: { invoiceNumber: true, customer: { select: { name: true } } } } },
+  });
+  if (!cn) return { title: { absolute: 'Credit note not found' } };
+  const number = cn.creditNoteNumber ?? `Credit request on ${cn.invoice.invoiceNumber}`;
+  return { title: { absolute: `${number} · ${cn.invoice.customer.name}` } };
+}
 
 export default async function CreditNotePrintPage({ params }: { params: Promise<{ creditNoteId: string }> }) {
   const session = await requirePageSession();

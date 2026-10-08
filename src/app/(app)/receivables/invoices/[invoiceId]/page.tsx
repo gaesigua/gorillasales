@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { requirePageSession } from '@/lib/tenant';
 import { getInvoice } from '@/lib/data/receivables';
@@ -7,6 +8,14 @@ import { formatRWFFull } from '@/lib/format';
 import { INVOICE_STATUS_LABELS, PAYMENT_METHOD_LABELS } from '@/lib/types';
 import DocumentHeader from '@/components/print/DocumentHeader';
 import PrintBar from '@/components/print/PrintButton';
+
+// The title is printed at the top of the page and becomes the "Save as PDF" file name
+export async function generateMetadata({ params }: { params: Promise<{ invoiceId: string }> }): Promise<Metadata> {
+  const session = await requirePageSession();
+  const { invoiceId } = await params;
+  const invoice = await getInvoice(session, invoiceId, todayKigali());
+  return { title: { absolute: invoice ? `${invoice.invoiceNumber} · ${invoice.customerName}` : 'Invoice not found' } };
+}
 
 export default async function InvoicePrintPage({ params }: { params: Promise<{ invoiceId: string }> }) {
   const session = await requirePageSession();

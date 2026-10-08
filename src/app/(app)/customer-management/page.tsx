@@ -4,6 +4,8 @@ import { listVisits } from '@/lib/data/visits';
 import { todayKigali } from '@/lib/dates';
 import CustomerTableClient from './components/CustomerTableClient';
 
+export const metadata = { title: 'Customers' };
+
 export default async function CustomerManagementPage() {
   const session = await requirePageSession();
   const today = todayKigali();

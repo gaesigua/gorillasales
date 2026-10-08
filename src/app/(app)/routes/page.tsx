@@ -5,6 +5,8 @@ import { addDaysToDate, todayKigali } from '@/lib/dates';
 import { isoWeekday } from '@/lib/domain/routes';
 import RoutesClient from './components/RoutesClient';
 
+export const metadata = { title: 'Routes' };
+
 export default async function RoutesPage() {
   const session = await requirePageSession(['ADMIN', 'MANAGER', 'SALES_OFFICER']);
   const today = todayKigali();

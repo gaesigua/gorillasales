@@ -7,6 +7,8 @@ import { listOrders } from '@/lib/data/orders';
 import { addDaysToDate, todayKigali } from '@/lib/dates';
 import DeliveriesClient from './components/DeliveriesClient';
 
+export const metadata = { title: 'Deliveries' };
+
 export default async function DeliveriesPage() {
   const session = await requirePageSession([...WAREHOUSE_ROLES, 'DRIVER']);
   const today = todayKigali();

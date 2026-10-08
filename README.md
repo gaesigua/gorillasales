@@ -141,6 +141,27 @@ before delivering orders: the migration creates a default "Main Warehouse" with 
 - Sales figures (dashboard, targets, commission, reports) are **net of approved credit
   notes**, counted in the month the credit note is issued.
 
+## Working offline (field reps)
+
+- **Visits, and the order taken on a visit, can be logged with no signal.** Open the Visits
+  page once while online; the phone keeps a copy of it (your customers, products and prices
+  as they were then). Offline, a line under the tabs says **No connection**, and saved visits
+  go into **"Saved on this phone, not yet sent"** on the Visits page.
+- Saved visits are **sent automatically** when the connection returns (and retried every
+  minute while any are waiting), or with **Send now**. Each visit carries an id made on the
+  phone, so a visit sent twice (dropped connection, two tabs) is stored only once.
+- **Prices, credit limits and stock rules are applied when the visit is sent**, not when it
+  was entered, so an order may arrive on credit hold. The visit keeps the time it was entered
+  (`capturedAt`).
+- If the server refuses a visit (e.g. the customer was reassigned), it stays on the phone as
+  **Not accepted** with the reason, to retry or delete. If the session has expired, the line
+  under the tabs asks you to sign in again; nothing is lost.
+- Other pages need a connection; offline they show a short notice with a link to Visits.
+- **Log out clears the phone**: the offline copy and any unsent visits (you are warned first).
+- Phones can **add GorillaSales to the home screen**; it opens on the Visits page.
+- Offline mode is only active in production builds (`npm run build && npm start`); the
+  service worker is `public/sw.js` and queued visits are sent to `POST /api/visits/sync`.
+
 ## Access rules
 
 - **Admins and managers** see all reps' data and can change configuration and users.

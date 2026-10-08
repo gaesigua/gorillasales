@@ -2,6 +2,7 @@ import React from 'react';
 import AppLayout from '@/components/AppLayout';
 import { ConfigProvider } from '@/context/ConfigContext';
 import { UserProvider } from '@/context/UserContext';
+import { OfflineProvider } from '@/context/OfflineContext';
 import { requirePageSession } from '@/lib/tenant';
 import { getAppConfig } from '@/lib/data/config';
 
@@ -23,7 +24,9 @@ export default async function AuthenticatedLayout({ children }: { children: Reac
   return (
     <UserProvider user={user}>
       <ConfigProvider config={config}>
-        <AppLayout>{children}</AppLayout>
+        <OfflineProvider>
+          <AppLayout>{children}</AppLayout>
+        </OfflineProvider>
       </ConfigProvider>
     </UserProvider>
   );

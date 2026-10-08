@@ -8,7 +8,11 @@ import { Toaster, toast } from 'sonner';
 import { formatRWFFull } from '@/lib/format';
 import { useConfig } from '@/context/ConfigContext';
 import { useUser } from '@/context/UserContext';
+import { useOffline } from '@/context/OfflineContext';
 import { createVisitLog } from '@/actions/visits';
+import { computeOrderTotals } from '@/lib/domain/money';
+import { todayKigali } from '@/lib/dates';
+import { newVisitRef } from '@/lib/offline/queue';
 import { CUSTOMER_TYPE_LABELS } from '@/lib/types';
 import OrderLinesEditor, { completedLines, emptyLine, type DraftLine } from '@/components/orders/OrderLinesEditor';
 import type { CustomerOption, PriceBook } from './DailySalesEntryClient';
@@ -30,8 +34,11 @@ interface SalesEntryFormProps {
   preset?: { customerId: string; salespersonId: string; nonce: number } | null;
 }
 
-export default function SalesEntryForm({ customers, priceBook, today, preset }: SalesEntryFormProps) {
+export default function SalesEntryForm({ customers, priceBook, today: serverToday, preset }: SalesEntryFormProps) {
   const router = useRouter();
+  const offline = useOffline();
+  // An offline copy of this page may be days old: "today" comes from the phone's clock
+  const [today, setToday] = useState(serverToday);
   const { config } = useConfig();
   const { currentUser, canViewAllReps } = useUser();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -54,6 +61,7 @@ export default function SalesEntryForm({ customers, priceBook, today, preset }: 
     reset,
     setValue,
     setFocus,
+    getValues,
     formState: { errors },
   } = useForm<VisitFormData>({ defaultValues: emptyForm });
 
@@ -69,26 +77,87 @@ export default function SalesEntryForm({ customers, priceBook, today, preset }: 
     config.products.find((p) => p.id === productId)?.unitPrice ??
     0;
 
+  useEffect(() => {
+    const phoneToday = todayKigali();
+    if (phoneToday === serverToday) return;
+    setToday(phoneToday);
+    if (getValues('dateOfVisit') === serverToday) setValue('dateOfVisit', phoneToday);
+  }, [serverToday, getValues, setValue]);
+
+  // Ready for the next visit: same rep and date, cursor on Customer
+  const resetForNext = (data: VisitFormData) => {
+    setSubmitSuccess(true);
+    setTimeout(() => {
+      setSubmitSuccess(false);
+      reset({ ...emptyForm, salespersonId: data.salespersonId, dateOfVisit: data.dateOfVisit });
+      setLines([emptyLine()]);
+      setFocus('customerId');
+    }, 1500);
+  };
+
   const onSubmit = async (data: VisitFormData) => {
     setIsSubmitting(true);
-    try {
-      const orderLines = completedLines(lines, canViewAllReps);
-      const res = await createVisitLog({
-        salespersonId: data.salespersonId || undefined,
-        customerId: data.customerId,
-        dateOfVisit: data.dateOfVisit,
-        visitOutcome: data.visitOutcome,
-        nextFollowUpDate: data.nextFollowUpDate || undefined,
-        remarks: data.remarks,
-        orderLines,
+    // The phone names the visit, so sending it twice (retry, or online save + queued copy) is harmless
+    const clientRef = newVisitRef();
+    const orderLines = completedLines(lines, canViewAllReps);
+    const input = {
+      salespersonId: data.salespersonId || undefined,
+      customerId: data.customerId,
+      dateOfVisit: data.dateOfVisit,
+      visitOutcome: data.visitOutcome,
+      nextFollowUpDate: data.nextFollowUpDate || undefined,
+      remarks: data.remarks,
+      orderLines,
+      clientRef,
+    };
+
+    const saveOnPhone = async () => {
+      const estimate = computeOrderTotals(
+        orderLines.map((l) => ({ quantity: l.quantity, unitPrice: l.unitPrice ?? priceFor(l.productId) })),
+        config.settings.vatRate,
+        config.settings.pricesIncludeVat
+      );
+      try {
+        await offline.enqueue({
+          clientRef,
+          userId: currentUser.id,
+          capturedAt: new Date().toISOString(),
+          input,
+          label: {
+            customerName: selectedCustomer?.name ?? 'Customer',
+            dateOfVisit: data.dateOfVisit,
+            visitOutcome: data.visitOutcome,
+            lineCount: orderLines.length,
+            estimatedTotal: estimate.total,
+          },
+          status: 'waiting',
+          attempts: 0,
+        });
+      } catch {
+        toast.error('Visit was not saved', { description: 'This phone cannot store visits offline (private browsing?).' });
+        return;
+      }
+      toast.success('Saved on this phone', {
+        description: 'No connection. It will be sent automatically when you are back online.',
       });
+      resetForNext(data);
+    };
+
+    try {
+      if (!navigator.onLine) return await saveOnPhone();
+      let res;
+      try {
+        res = await createVisitLog(input);
+      } catch {
+        // Connection dropped (or the app was updated meanwhile): keep it and send it later
+        return await saveOnPhone();
+      }
 
       if (!res.success) {
         toast.error('Visit was not saved', { description: res.error });
         return;
       }
 
-      setSubmitSuccess(true);
       const v = res.data;
       toast.success(v?.orderNumber ? `Visit and order ${v.orderNumber} saved` : 'Visit logged', {
         description: v?.orderNumber
@@ -96,13 +165,7 @@ export default function SalesEntryForm({ customers, priceBook, today, preset }: 
           : v?.customerName,
       });
       router.refresh();
-      setTimeout(() => {
-        setSubmitSuccess(false);
-        reset({ ...emptyForm, salespersonId: data.salespersonId, dateOfVisit: data.dateOfVisit });
-        setLines([emptyLine()]);
-        // Ready for the next visit: same rep and date, cursor on Customer
-        setFocus('customerId');
-      }, 1500);
+      resetForNext(data);
     } finally {
       setIsSubmitting(false);
     }

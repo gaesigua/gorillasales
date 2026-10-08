@@ -4,6 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useUser } from '@/context/UserContext';
+import { useOffline } from '@/context/OfflineContext';
 import { logoutAction } from '@/actions/auth';
 import { ROLE_LABELS, WAREHOUSE_ROLES, type Role } from '@/lib/roles';
 
@@ -37,6 +38,7 @@ const TABS: Tab[] = [
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { currentUser } = useUser();
+  const offline = useOffline();
   const tabs = TABS.filter((t) => !t.roles || t.roles.includes(currentUser.role));
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
 
@@ -58,8 +60,22 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <button
               type="button"
               onClick={async () => {
-                await logoutAction();
-                window.location.href = '/login';
+                const unsent = offline.queued.length;
+                if (
+                  unsent > 0 &&
+                  !window.confirm(
+                    `${unsent} visit${unsent === 1 ? ' has' : 's have'} not been sent yet. Logging out deletes ${unsent === 1 ? 'it' : 'them'} from this phone. Log out anyway?`
+                  )
+                ) {
+                  return;
+                }
+                // Customer data and unsent visits must not stay on a shared phone
+                await offline.clearDevice();
+                try {
+                  await logoutAction();
+                } finally {
+                  window.location.href = '/login';
+                }
               }}
               className="text-white underline"
             >
@@ -90,11 +106,53 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </ul>
       </nav>
 
+      <OfflineStatusBar />
+
       <main>{children}</main>
 
       <footer className="no-print border-t border-border mt-8 px-4 py-3 text-xs text-muted-foreground">
         GorillaSales · {currentUser.organizationName}
       </footer>
+    </div>
+  );
+}
+
+/** One line under the tabs while offline, or while visits saved on this phone are waiting. */
+function OfflineStatusBar() {
+  const { online, queued, syncing, notice, needsSignIn, syncNow } = useOffline();
+  const waiting = queued.filter((v) => v.status === 'waiting').length;
+  const rejected = queued.length - waiting;
+  if (online && queued.length === 0 && !notice) return null;
+
+  const alert = !online || rejected > 0 || needsSignIn;
+  return (
+    <div
+      role="status"
+      className={`no-print border-b px-4 py-1.5 text-sm ${alert ? 'bg-warning-bg border-warning' : 'bg-muted border-border'}`}
+    >
+      {!online && <strong>No connection. </strong>}
+      {!online && 'Visits you log are kept on this phone and sent when the connection returns. '}
+      {waiting > 0 && (
+        <>
+          {waiting} visit{waiting === 1 ? '' : 's'} waiting to be sent.{' '}
+          {online && !needsSignIn && (
+            <button type="button" onClick={syncNow} disabled={syncing} className="text-link underline">
+              {syncing ? 'Sending...' : 'Send now'}
+            </button>
+          )}{' '}
+        </>
+      )}
+      {needsSignIn && (
+        <>
+          Your session has ended: <a href="/login?from=/daily-sales-entry">sign in again</a> to send them.{' '}
+        </>
+      )}
+      {rejected > 0 && (
+        <>
+          {rejected} visit{rejected === 1 ? '' : 's'} could not be accepted — <Link href="/daily-sales-entry">see Visits</Link>.{' '}
+        </>
+      )}
+      {online && notice && queued.length === 0 && notice}
     </div>
   );
 }

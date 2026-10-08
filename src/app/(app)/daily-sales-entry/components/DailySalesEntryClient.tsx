@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import SalesEntryForm from './SalesEntryForm';
 import RecentEntriesTable from './RecentEntriesTable';
+import PendingVisitsPanel from './PendingVisitsPanel';
 import { useUser } from '@/context/UserContext';
 import { useConfig } from '@/context/ConfigContext';
 import { deleteVisitLog } from '@/actions/visits';
@@ -153,6 +154,8 @@ export default function DailySalesEntryClient({ visits, customers, priceBook, ro
         </div>
         <SalesEntryForm customers={customers} priceBook={priceBook} today={today} preset={preset} />
       </div>
+
+      <PendingVisitsPanel />
 
       {/* Recent entries table */}
       <div>

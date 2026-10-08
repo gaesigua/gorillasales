@@ -279,6 +279,10 @@ model VisitLog {
   visitOutcome     String // e.g. Order Placed, Visit Only, Follow-up Required
   nextFollowUpDate DateTime? @db.Date
   remarks          String?
+  /// Id generated on the phone when the visit was entered; makes re-sending a queued visit safe
+  clientRef        String?
+  /// When the visit was entered on the phone, if it was saved offline and sent later
+  capturedAt       DateTime?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
@@ -290,6 +294,7 @@ model VisitLog {
   @@index([organizationId])
   @@index([salespersonId])
   @@index([customerId])
+  @@unique([organizationId, clientRef])
   @@index([dateOfVisit])
   @@map("visit_logs")
 }

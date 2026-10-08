@@ -12,5 +12,9 @@ const nextConfig = {
     minimumCacheTTL: 60,
     qualities: [75, 85, 100],
   },
+  async headers() {
+    // The service worker must always be re-checked, or phones keep an old one for a day
+    return [{ source: '/sw.js', headers: [{ key: 'Cache-Control', value: 'no-cache' }] }];
+  },
 };
 export default nextConfig;
